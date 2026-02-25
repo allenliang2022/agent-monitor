@@ -19,10 +19,20 @@ function statusBadge(status: string) {
       text: "text-green-400",
       border: "border-green-500/20",
     },
+    done: {
+      bg: "bg-green-500/10",
+      text: "text-green-400",
+      border: "border-green-500/20",
+    },
     failed: {
       bg: "bg-red-500/10",
       text: "text-red-400",
       border: "border-red-500/20",
+    },
+    dead: {
+      bg: "bg-orange-500/10",
+      text: "text-orange-400",
+      border: "border-orange-500/20",
     },
     pending: {
       bg: "bg-amber-500/10",
@@ -72,9 +82,12 @@ function cardBorderColor(status: string): string {
     case "running":
       return "border-cyan-500/20 shadow-[0_0_20px_rgba(0,212,255,0.06)]";
     case "completed":
+    case "done":
       return "border-green-500/15";
     case "failed":
       return "border-red-500/20";
+    case "dead":
+      return "border-orange-500/20";
     case "pending":
       return "border-amber-500/15";
     default:
@@ -165,7 +178,7 @@ export default function TasksPage() {
   const running = tasks.filter((t) => t.status === "running");
   const pending = tasks.filter((t) => t.status === "pending");
   const history = tasks.filter(
-    (t) => t.status === "completed" || t.status === "failed"
+    (t) => t.status === "completed" || t.status === "failed" || t.status === "done" || t.status === "dead" || t.status === "unknown"
   );
 
   return (

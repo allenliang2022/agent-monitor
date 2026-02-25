@@ -1,0 +1,394 @@
+[0m
+> build · claude-opus-4.6
+[0m
+[0m# [0mTodos
+[ ] Task 1: Fix treemap layout on Files page (app/live/files/page.tsx)
+[ ] Task 2: Enhance Explore cards on Overview page (app/live/page.tsx)
+[ ] Task 3: Add timing info to Monitoring page (app/live/monitoring/page.tsx)
+[ ] Run npm run build to verify
+[0m
+I'll start by exploring the codebase structure and reading the relevant files to understand the current implementation.
+[0m
+[0m→ [0mRead app/live/files/page.tsx
+[0m→ [0mRead app/live/page.tsx
+[0m→ [0mRead app/live/monitoring/page.tsx
+[0m• [0mExplore codebase structure[90m Explore Agent[0m
+[0m✓ [0mExplore codebase structure[90m Explore Agent[0m
+[0m
+[0m# [0mTodos
+[ ] Task 1: Fix treemap layout on Files page (app/live/files/page.tsx)
+[ ] Task 2: Enhance Explore cards on Overview page (app/live/page.tsx)
+[ ] Task 3: Add timing info to Monitoring page (app/live/monitoring/page.tsx)
+[ ] Run npm run build to verify
+[0m
+Now I have a thorough understanding of the codebase. Let me start implementing the three tasks.
+[0m
+[0m→ [0mRead app/live/LiveContext.tsx[90m [limit=130][0m
+[0m
+Let me read the LiveContext to understand the types available:
+[0m
+Good. Now I have all the context I need. Let me implement all three tasks. I'll start with Task 1 - the Files page treemap fix.
+[0m
+[0m← [0mWrite app/live/files/page.tsx
+Wrote file successfully.
+[0m
+[0m# [0mTodos
+[x] Task 1: Fix treemap layout on Files page (app/live/files/page.tsx)
+[ ] Task 2: Enhance Explore cards on Overview page (app/live/page.tsx)
+[ ] Task 3: Add timing info to Monitoring page (app/live/monitoring/page.tsx)
+[ ] Run npm run build to verify
+[0m
+Now Task 2 - enhancing the Explore cards on the Overview page. I need to add icons, hover glow, live count badges, and links.
+[0m
+[0m← [0mEdit app/live/page.tsx
+Index: /Users/liang/work/agent-monitor-worktrees/ui-polish/app/live/page.tsx
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/ui-polish/app/live/page.tsx
++++ /Users/liang/work/agent-monitor-worktrees/ui-polish/app/live/page.tsx
+@@ -117,48 +117,106 @@
+ }
+ 
+ // ─── Nav Cards ──────────────────────────────────────────────────────────────
+ 
+-const navCards = [
++// SVG icon components for nav cards
++function ClockIcon({ className }: { className?: string }) {
++  return (
++    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
++      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
++    </svg>
++  );
++}
++function RobotIcon({ className }: { className?: string }) {
++  return (
++    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
++      <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 3v1.5M4.5 8.25H3m18 0h-1.5M4.5 12H3m18 0h-1.5m-15 3.75H3m18 0h-1.5M8.25 19.5V21M12 3v1.5m3.75-1.5v1.5m-7.5 15V21M12 19.5V21m3.75-1.5V21m-9-16.5h10.5a2.25 2.25 0 0 1 2.25 2.25v7.5a2.25 2.25 0 0 1-2.25 2.25H6.75a2.25 2.25 0 0 1-2.25-2.25v-7.5A2.25 2.25 0 0 1 6.75 4.5ZM9 10.5a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Zm6 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z" />
++    </svg>
++  );
++}
++function TaskIcon({ className }: { className?: string }) {
++  return (
++    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
++      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15a2.25 2.25 0 0 1 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25ZM6.75 12h.008v.008H6.75V12Zm0 3h.008v.008H6.75V15Zm0 3h.008v.008H6.75V18Z" />
++    </svg>
++  );
++}
++function BranchIcon({ className }: { className?: string }) {
++  return (
++    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
++      <path strokeLinecap="round" strokeLinejoin="round" d="M17.25 6.75 22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3-4.5 16.5" />
++    </svg>
++  );
++}
++function PromptIcon({ className }: { className?: string }) {
++  return (
++    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
++      <path strokeLinecap="round" strokeLinejoin="round" d="m6.75 7.5 3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0 0 21 18V6a2.25 2.25 0 0 0-2.25-2.25H5.25A2.25 2.25 0 0 0 3 6v12a2.25 2.25 0 0 0 2.25 2.25Z" />
++    </svg>
++  );
++}
++
++interface NavCard {
++  href: string;
++  title: string;
++  desc: string;
++  borderClass: string;
++  textClass: string;
++  glowColor: string;
++  icon: React.ReactNode;
++  badgeKey: "events" | "agents" | "tasks" | "commits" | "prompts";
++}
++
++const navCards: NavCard[] = [
+   {
+     href: "/live/timeline",
+     title: "Live Timeline",
+     desc: "Real-time events as agents work",
+-    borderClass: "border-cyan-400/20 hover:border-cyan-400/40",
++    borderClass: "border-cyan-400/20 hover:border-cyan-400/50",
+     textClass: "text-cyan-400",
+-    icon: ">>",
++    glowColor: "rgba(34,211,238,0.08)",
++    icon: <ClockIcon className="w-5 h-5" />,
++    badgeKey: "events",
+   },
+   {
+     href: "/live/agents",
+     title: "Agent Monitor",
+     desc: "Active agent cards with status & logs",
+-    borderClass: "border-purple-500/20 hover:border-purple-500/40",
++    borderClass: "border-purple-500/20 hover:border-purple-500/50",
+     textClass: "text-purple-500",
+-    icon: "#_",
++    glowColor: "rgba(168,85,247,0.08)",
++    icon: <RobotIcon className="w-5 h-5" />,
++    badgeKey: "agents",
+   },
+   {
+     href: "/live/tasks",
+     title: "Task Queue",
+     desc: "Active and completed agent tasks",
+-    borderClass: "border-amber-400/20 hover:border-amber-400/40",
++    borderClass: "border-amber-400/20 hover:border-amber-400/50",
+     textClass: "text-amber-400",
+-    icon: "[]",
++    glowColor: "rgba(251,191,36,0.08)",
++    icon: <TaskIcon className="w-5 h-5" />,
++    badgeKey: "tasks",
+   },
+   {
+     href: "/live/git",
+     title: "Git Activity",
+     desc: "Watch directories and track commits",
+-    borderClass: "border-emerald-400/20 hover:border-emerald-400/40",
++    borderClass: "border-emerald-400/20 hover:border-emerald-400/50",
+     textClass: "text-emerald-400",
+-    icon: "~>",
++    glowColor: "rgba(52,211,153,0.08)",
++    icon: <BranchIcon className="w-5 h-5" />,
++    badgeKey: "commits",
+   },
+   {
+     href: "/live/prompt",
+     title: "Prompt Architecture",
+     desc: "Prompts sent to coding agents",
+-    borderClass: "border-purple-500/20 hover:border-purple-500/40",
++    borderClass: "border-purple-500/20 hover:border-purple-500/50",
+     textClass: "text-purple-500",
+-    icon: "$:",
++    glowColor: "rgba(168,85,247,0.08)",
++    icon: <PromptIcon className="w-5 h-5" />,
++    badgeKey: "prompts",
+   },
+ ];
+ 
+ // ─── Page ───────────────────────────────────────────────────────────────────
+
+[0m
+Now update the page component to compute badge counts and render the enhanced nav cards:
+[0m
+[0m← [0mEdit app/live/page.tsx
+Index: /Users/liang/work/agent-monitor-worktrees/ui-polish/app/live/page.tsx
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/ui-polish/app/live/page.tsx
++++ /Users/liang/work/agent-monitor-worktrees/ui-polish/app/live/page.tsx
+@@ -252,8 +252,20 @@
+   }
+   return count;
+ }, [gitData]);
+ 
++// Badge counts for nav cards
++const badgeCounts = useMemo(
++  () => ({
++    events: sseEventsCount,
++    agents: activeAgents,
++    tasks: totalTasks,
++    commits: totalCommits,
++    prompts: 0, // prompts are loaded on-demand
++  }),
++  [sseEventsCount, activeAgents, totalTasks, totalCommits]
++);
++
+ return (
+   <div className="p-4 md:p-8 pt-6 space-y-8 max-w-7xl mx-auto">
+     {/* ── MISSION CONTROL Hero ─────────────────────────────────────────── */}
+     <motion.div
+
+[0m
+Now update the navigation cards rendering section:
+[0m
+[0m← [0mEdit app/live/page.tsx
+Index: /Users/liang/work/agent-monitor-worktrees/ui-polish/app/live/page.tsx
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/ui-polish/app/live/page.tsx
++++ /Users/liang/work/agent-monitor-worktrees/ui-polish/app/live/page.tsx
+@@ -523,35 +523,68 @@
+       <h2 className="text-sm font-mono text-slate-300 mb-3 flex items-center gap-2">
+         <span className="text-slate-400">&gt;</span> Explore
+       </h2>
+       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+-        {navCards.map((card, i) => (
+-          <Link key={card.href} href={card.href}>
+-            <motion.div
+-              initial={{ opacity: 0, y: 15 }}
+-              animate={{ opacity: 1, y: 0 }}
+-              transition={{ delay: 0.65 + i * 0.08 }}
+-              className={`bg-slate-900/50 border ${card.borderClass} rounded-lg p-4 transition-all cursor-pointer group`}
+-              whileHover={{ scale: 1.02, y: -2 }}
+-            >
+-              <div className="flex items-center gap-2 mb-1">
+-                <span
+-                  className={`text-xs font-mono ${card.textClass} opacity-50 group-hover:opacity-100 transition-opacity`}
+-                >
+-                  {card.icon}
+-                </span>
+-                <h3
+-                  className={`text-sm font-mono font-semibold ${card.textClass}`}
+-                >
+-                  {card.title}
+-                </h3>
+-              </div>
+-              <p className="text-xs font-mono text-slate-400">
+-                {card.desc}
+-              </p>
+-            </motion.div>
+-          </Link>
+-        ))}
++        {navCards.map((card, i) => {
++          const count = badgeCounts[card.badgeKey];
++          return (
++            <Link key={card.href} href={card.href}>
++              <motion.div
++                initial={{ opacity: 0, y: 15 }}
++                animate={{ opacity: 1, y: 0 }}
++                transition={{ delay: 0.65 + i * 0.08 }}
++                className={`relative bg-slate-900/50 border ${card.borderClass} rounded-lg p-4 transition-all cursor-pointer group overflow-hidden`}
++                whileHover={{ scale: 1.02, y: -2 }}
++                style={{
++                  boxShadow: "none",
++                }}
++                onHoverStart={(e) => {
++                  const el = e.target as HTMLElement;
++                  const container = el.closest("[style]") as HTMLElement;
++                  if (container) container.style.boxShadow = `0 0 24px 2px ${card.glowColor}, 0 0 48px 4px ${card.glowColor}`;
++                }}
++                onHoverEnd={(e) => {
++                  const el = e.target as HTMLElement;
++                  const container = el.closest("[style]") as HTMLElement;
++                  if (container) container.style.boxShadow = "none";
++                }}
++              >
++                {/* Subtle background glow on hover */}
++                <div
++                  className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
++                  style={{
++                    background: `radial-gradient(ellipse at center, ${card.glowColor} 0%, transparent 70%)`,
++                  }}
++                />
++
++                <div className="relative">
++                  <div className="flex items-center gap-2.5 mb-1.5">
++                    <span
++                      className={`${card.textClass} opacity-60 group-hover:opacity-100 transition-opacity`}
++                    >
++                      {card.icon}
++                    </span>
++                    <h3
++                      className={`text-sm font-mono font-semibold ${card.textClass}`}
++                    >
++                      {card.title}
++                    </h3>
++                    {count > 0 && (
++                      <span
++                        className={`ml-auto text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-full ${card.textClass} bg-slate-800/80 border border-slate-700/50`}
++                      >
++                        {count}
++                      </span>
++                    )}
++                  </div>
++                  <p className="text-xs font-mono text-slate-400">
++                    {card.desc}
++                  </p>
++                </div>
++              </motion.div>
++            </Link>
++          );
++        })}
+       </div>
+     </motion.section>
+   </div>
+ );
+
+[0m
+[0m# [0mTodos
+[x] Task 1: Fix treemap layout on Files page (app/live/files/page.tsx)
+[x] Task 2: Enhance Explore cards on Overview page (app/live/page.tsx)
+[ ] Task 3: Add timing info to Monitoring page (app/live/monitoring/page.tsx)
+[ ] Run npm run build to verify
+[0m
+Now Task 3 - adding timing info to the Monitoring page. I need to show duration at each stage, task names next to count badges, and timestamps for when the last task entered each stage.
+[0m
+[0m← [0mWrite app/live/monitoring/page.tsx
+Wrote file successfully.
+[0m
+[0m# [0mTodos
+[x] Task 1: Fix treemap layout on Files page (app/live/files/page.tsx)
+[x] Task 2: Enhance Explore cards on Overview page (app/live/page.tsx)
+[x] Task 3: Add timing info to Monitoring page (app/live/monitoring/page.tsx)
+[ ] Run npm run build to verify
+[0m
+[0m$ [0mnpm run build 2>&1
+> agent-monitor@0.1.0 build
+> next build
+
+▲ Next.js 16.1.6 (Turbopack)
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 1772.8ms
+  Running TypeScript ...
+  Collecting page data using 9 workers ...
+  Generating static pages using 9 workers (0/14) ...
+  Generating static pages using 9 workers (3/14) 
+  Generating static pages using 9 workers (6/14) 
+  Generating static pages using 9 workers (10/14) 
+✓ Generating static pages using 9 workers (14/14) in 137.0ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ƒ /api/agent-log
+├ ƒ /api/agent-tasks
+├ ƒ /api/config
+├ ƒ /api/events
+├ ƒ /api/file-changes
+├ ƒ /api/git
+├ ƒ /api/git-diff
+├ ƒ /api/health
+├ ƒ /api/prompts
+├ ƒ /api/sessions
+├ ○ /live
+├ ○ /live/agent
+├ ○ /live/agents
+├ ○ /live/architecture
+├ ○ /live/files
+├ ○ /live/git
+├ ○ /live/monitoring
+├ ○ /live/prompt
+├ ○ /live/tasks
+└ ○ /live/timeline
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+[0m
+Build passes cleanly with no errors.
+[0m
+[0m# [0mTodos
+[x] Task 1: Fix treemap layout on Files page (app/live/files/page.tsx)
+[x] Task 2: Enhance Explore cards on Overview page (app/live/page.tsx)
+[x] Task 3: Add timing info to Monitoring page (app/live/monitoring/page.tsx)
+[x] Run npm run build to verify
+[0m
+All three tasks are complete and the build passes. Here's a summary of the changes:
+
+### Task 1: Files page treemap layout (`app/live/files/page.tsx`)
+- **Card grid for few files (<= 5)**: When there are 5 or fewer files, displays them as individual cards in a responsive grid. Each card shows: filename, full path, task name with color dot, +additions/-deletions stats, and a proportional bar chart (green for adds, red for deletes) showing relative size vs the largest file.
+- **Squarified treemap for many files (> 5)**: Replaced the original naive row-based algorithm with a proper squarified treemap that produces more square-shaped (readable) rectangles with better proportional sizing.
+- **Minimum readable sizes**: Labels show at `w > 50 && h > 24` for filenames and `w > 60 && h > 42` for stats.
+- **Enhanced tooltip**: Improved styling with `backdrop-blur-sm`, shadow, and shows total lines count.
+- **Size column in table**: Added a mini bar chart column to the file table showing relative size with add/del coloring.
+
+### Task 2: Overview Explore cards (`app/live/page.tsx`)
+- **SVG icons**: Replaced plain text icons (`>>`, `#_`, `[]`, etc.) with proper SVG icons - clock for Timeline, robot for Agents, clipboard for Tasks, code brackets for Git, terminal for Prompts.
+- **Hover glow effect**: Added a `radial-gradient` background glow and `boxShadow` glow effect on hover, matching each card's color theme (cyan, purple, amber, emerald).
+- **Live count badges**: Shows real-time counts from SSE data - event count, active agents, total tasks, total commits - as small pill badges on the right side of each card header.
+- **Links preserved**: Cards already linked to `/live/` sub-pages; structure maintained.
+
+### Task 3: Monitoring page timing (`app/live/monitoring/page.tsx`)
+- **Duration at each stage**: Shows how long the longest-running task has been at each stage (e.g., "19m 30s") as a label next to the node in the flowchart.
+- **Task names on nodes**: Displays up to 3 task names next to each stage node (with "+N more" overflow), positioned intelligently (right of left-side nodes, left of right-side nodes).
+- **Last-entered timestamp**: Shows "@ HH:MM:SS" indicating when the last task entered each stage.
+- **Enhanced tooltip**: Hover tooltip now shows duration badge and per-task "X ago" timing.
+- **Summary cards enhanced**: Bottom summary cards now show task names, duration, and last-entered timestamps alongside the counts.
+[0m

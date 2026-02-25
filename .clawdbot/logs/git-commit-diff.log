@@ -1,0 +1,142 @@
+[0m
+> build · claude-opus-4.6
+[0m
+[0m# [0mTodos
+[ ] Explore existing codebase structure (git page, API patterns, LiveContext)
+[ ] Create /api/git-diff/route.ts API endpoint
+[ ] Update app/live/git/page.tsx with inline diff viewer
+[ ] Run npm run build to verify no type errors
+[0m
+I'll start by understanding the existing codebase structure, then implement the changes step by step.
+[0m
+[0m→ [0mRead app/live/git/page.tsx
+[0m✱ [0mGlob "app/api/**/*.ts"[90m 9 matches[0m
+[0m✱ [0mGlob "app/live/**/LiveContext*"[90m 1 match[0m
+[0m→ [0mRead app/api/git/route.ts
+[0m→ [0mRead app/live/LiveContext.tsx
+[0m
+[0m# [0mTodos
+[x] Explore existing codebase structure (git page, API patterns, LiveContext)
+[ ] Create /api/git-diff/route.ts API endpoint
+[ ] Update app/live/git/page.tsx with inline diff viewer
+[ ] Run npm run build to verify no type errors
+[0m
+Good, I now have a clear picture of the codebase. Let me check the existing API pattern more closely and also look at the tailwind/next config for any specifics.
+[0m
+Now let me create the API endpoint and the updated git page. I'll check that the `app/api/git-diff` directory doesn't exist yet.
+[0m
+[0m$ [0mls app/api/
+agent-log
+agent-tasks
+config
+events
+file-changes
+git
+health
+prompts
+sessions
+[0m
+Good, no `git-diff` directory yet. Let me create both files now.
+[0m
+[0m$ [0mmkdir -p app/api/git-diff
+[0m
+[0m← [0mWrite app/api/git-diff/route.ts
+Wrote file successfully.
+[0m
+[0m# [0mTodos
+[x] Explore existing codebase structure (git page, API patterns, LiveContext)
+[x] Create /api/git-diff/route.ts API endpoint
+[ ] Update app/live/git/page.tsx with inline diff viewer
+[ ] Run npm run build to verify no type errors
+[0m
+Now let me write the updated git page with the inline diff viewer:
+[0m
+[0m← [0mWrite app/live/git/page.tsx
+Wrote file successfully.
+[0m
+[0m# [0mTodos
+[x] Explore existing codebase structure (git page, API patterns, LiveContext)
+[x] Create /api/git-diff/route.ts API endpoint
+[x] Update app/live/git/page.tsx with inline diff viewer
+[ ] Run npm run build to verify no type errors
+[0m
+[0m$ [0mnpm run build 2>&1
+> agent-monitor@0.1.0 build
+> next build
+
+▲ Next.js 16.1.6 (Turbopack)
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 1738.0ms
+  Running TypeScript ...
+  Collecting page data using 9 workers ...
+  Generating static pages using 9 workers (0/14) ...
+  Generating static pages using 9 workers (3/14) 
+  Generating static pages using 9 workers (6/14) 
+  Generating static pages using 9 workers (10/14) 
+✓ Generating static pages using 9 workers (14/14) in 132.8ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ƒ /api/agent-log
+├ ƒ /api/agent-tasks
+├ ƒ /api/config
+├ ƒ /api/events
+├ ƒ /api/file-changes
+├ ƒ /api/git
+├ ƒ /api/git-diff
+├ ƒ /api/health
+├ ƒ /api/prompts
+├ ƒ /api/sessions
+├ ○ /live
+├ ○ /live/agent
+├ ○ /live/agents
+├ ○ /live/architecture
+├ ○ /live/files
+├ ○ /live/git
+├ ○ /live/monitoring
+├ ○ /live/prompt
+├ ○ /live/tasks
+└ ○ /live/timeline
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+[0m
+[0m# [0mTodos
+[x] Explore existing codebase structure (git page, API patterns, LiveContext)
+[x] Create /api/git-diff/route.ts API endpoint
+[x] Update app/live/git/page.tsx with inline diff viewer
+[x] Run npm run build to verify no type errors
+[0m
+Build passes cleanly with no errors.
+[0m
+All done. Build passes with zero errors. Here's a summary of what was implemented:
+
+### Created: `app/api/git-diff/route.ts`
+- Accepts `dir` and `hash` query params
+- Validates hash format (hex, 7-40 chars)
+- Handles root commits (no parent) by diffing against the empty tree SHA
+- Returns `{ diff, files: [{path, additions, deletions}], stats: {filesChanged, additions, deletions} }`
+- Uses `git diff --numstat` for structured per-file stats
+- Follows the same `execGit` helper pattern as the existing `/api/git` route
+
+### Modified: `app/live/git/page.tsx`
+- **`CommitNode` is now clickable/expandable** — clicking a commit row fetches the diff from `/api/git-diff` and shows it inline; clicking again collapses it
+- **Diff is cached** — once fetched, re-expanding doesn't refetch
+- **`DiffViewer` component** shows:
+  - Overall stats bar (`N files +additions -deletions`)
+  - File tabs with per-file add/delete counts; click to switch between files
+  - Syntax-highlighted diff with green `+` lines (on `bg-green-500/10`) and red `-` lines (on `bg-red-500/10`), plus colored left borders
+  - Hunk headers styled in blue
+  - Scrollable container (`max-h-80`) with dark background
+  - Loading spinner while fetching
+  - Error display on failure
+- **`parseDiffToFiles`** — a zero-dependency parser that splits raw `git diff` output into per-file hunks with typed lines (add/del/ctx/hunk)
+- **Framer Motion** `AnimatePresence` for smooth expand/collapse animation
+- Timeline dot turns purple when expanded for visual feedback
+- A hint "click to expand" was added to the column header
+- The `dir` prop is passed through to `CommitNode` so it can construct the API call
+[0m

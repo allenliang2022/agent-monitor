@@ -245,19 +245,28 @@ export function LiveProvider({ children }: { children: ReactNode }) {
           if (data.type === "update") {
             setSseEventsCount((prev) => prev + 1);
 
-            // Update tasks from SSE if present
+            // Update tasks from SSE if present — diff to generate events
             if (data.tasks && Array.isArray(data.tasks)) {
-              setTasks(data.tasks);
+              setTasks((prevTasks) => {
+                const prevMap = new Map(prevTasks.map(t => [t.id, t]));
+                const newTasks = data.tasks as AgentTask[];
+                for (const task of newTasks) {
+                  const prev = prevMap.get(task.id);
+                  if (!prev) {
+                    addLog("agent", `Task spawned: ${task.id} (${task.agent})`);
+                  } else if (prev.status !== task.status) {
+                    addLog("agent", `${task.id}: ${prev.status} → ${task.status}`);
+                  } else if (prev.tmuxAlive && !task.tmuxAlive) {
+                    addLog("agent", `${task.id}: agent process exited`);
+                  }
+                }
+                return newTasks;
+              });
             }
 
             // Update file changes from SSE if present
             if (data.fileChanges) {
               setFileChanges(data.fileChanges);
-            }
-
-            // Log agent-relevant events
-            if (data.message) {
-              addLog("agent", data.message);
             }
           } else if (data.type === "error") {
             addLog("error", data.message ?? "Unknown error");

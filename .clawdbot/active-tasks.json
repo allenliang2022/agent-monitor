@@ -12,5 +12,61 @@
     "retries": 0,
     "maxRetries": 3,
     "notifyOnComplete": true
+  },
+  {
+    "id": "git-commit-diff",
+    "tmuxSession": "agent-git-commit-diff",
+    "agent": "opencode",
+    "description": "Add commit diff viewer to Git page",
+    "repo": "agent-monitor",
+    "worktree": "git-commit-diff",
+    "branch": "feat/git-commit-diff",
+    "startedAt": 1772036309000,
+    "status": "running",
+    "retries": 0,
+    "maxRetries": 3,
+    "notifyOnComplete": true
+  },
+  {
+    "id": "git-tabs",
+    "tmuxSession": "agent-git-tabs",
+    "agent": "opencode",
+    "description": "Split Git page into per-project tabs",
+    "repo": "agent-monitor",
+    "worktree": "git-tabs",
+    "branch": "feat/git-tabs",
+    "startedAt": 1772036982000,
+    "status": "running",
+    "retries": 0,
+    "maxRetries": 3,
+    "notifyOnComplete": true
+  },
+  {
+    "id": "data-fixes",
+    "tmuxSession": "agent-data-fixes",
+    "agent": "opencode",
+    "description": "Fix data issues: tasks not showing, agent stats missing",
+    "repo": "agent-monitor",
+    "worktree": "data-fixes",
+    "branch": "feat/data-fixes",
+    "startedAt": 1772037579000,
+    "status": "running",
+    "retries": 0,
+    "maxRetries": 3,
+    "notifyOnComplete": true
+  },
+  {
+    "id": "ui-polish",
+    "tmuxSession": "agent-ui-polish",
+    "agent": "opencode",
+    "description": "Polish UI: treemap layout, overview explore cards, monitoring timestamps",
+    "repo": "agent-monitor",
+    "worktree": "ui-polish",
+    "branch": "feat/ui-polish",
+    "startedAt": 1772037606000,
+    "status": "running",
+    "retries": 0,
+    "maxRetries": 3,
+    "notifyOnComplete": true
   }
 ]

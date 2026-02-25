@@ -119,7 +119,7 @@ export async function GET() {
         const wtPath = typeof worktreePath === 'string' ? worktreePath : '';
         if (wtPath && existsSync(wtPath)) {
           const diffStat = execSync(
-            `cd "${wtPath}" && git diff --stat HEAD~1..HEAD 2>/dev/null || echo ""`,
+            `cd "${wtPath}" && git diff --stat main..HEAD 2>/dev/null || git diff --stat HEAD~1..HEAD 2>/dev/null || echo ""`,
             { encoding: "utf-8", timeout: 5000, stdio: "pipe" }
           );
           const lines = diffStat.trim().split("\n");
