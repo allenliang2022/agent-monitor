@@ -13,6 +13,7 @@ const ACTIVE_TASKS_FILE = join(CLAWDBOT_DIR, "active-tasks.json");
 // Derive worktree base path: parent directory + '-worktrees/'
 // e.g., /Users/liang/work/agent-monitor -> /Users/liang/work/agent-monitor-worktrees/
 const PROJECT_DIR = process.cwd();
+const REPO_ROOT = PROJECT_DIR;
 const WORKTREE_BASE = join(
   PROJECT_DIR,
   "..",
@@ -105,7 +106,25 @@ export async function GET() {
               inferredStatus = "dead";
             }
           } else {
-            inferredStatus = "dead";
+            // Worktree removed - check if branch was merged to main
+            try {
+              const merged = execGit(
+                `git branch --merged main 2>/dev/null | grep -q "${task.branch || 'never-match'}" && echo "yes" || echo "no"`,
+                REPO_ROOT
+              ).trim();
+              if (merged === "yes") {
+                inferredStatus = "completed";
+              } else {
+                // Check if branch exists at all (has commits)
+                const branchExists = execGit(
+                  `git rev-parse --verify "${task.branch}" 2>/dev/null && echo "yes" || echo "no"`,
+                  REPO_ROOT
+                ).trim();
+                inferredStatus = branchExists === "yes" ? "completed" : "dead";
+              }
+            } catch {
+              inferredStatus = "dead";
+            }
           }
         } catch {
           inferredStatus = "dead";

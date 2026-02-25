@@ -1,0 +1,281 @@
+[0m
+> build · claude-opus-4.6
+[0m
+[0m# [0mTodos
+[ ] Read and understand current app/api/file-changes/route.ts
+[ ] Read and understand current app/api/agent-tasks/route.ts
+[ ] Understand git worktree structure and data sources
+[ ] Fix file-changes API: detect committed + uncommitted changes
+[ ] Add per-file details to file-changes API response
+[ ] Update agent-tasks API to use same detection method
+[ ] Run npm run build to verify
+[0m
+I'll start by understanding the current codebase structure and the existing API implementations.
+[0m
+[0m→ [0mRead app/api/file-changes/route.ts
+[0m→ [0mRead app/api/agent-tasks/route.ts
+[0m→ [0mRead .
+[0m
+[0m# [0mTodos
+[x] Read and understand current app/api/file-changes/route.ts
+[x] Read and understand current app/api/agent-tasks/route.ts
+[ ] Understand git worktree structure and data sources
+[ ] Fix file-changes API: detect committed + uncommitted changes
+[ ] Add per-file details to file-changes API response
+[ ] Update agent-tasks API to use same detection method
+[ ] Run npm run build to verify
+[0m
+[0m→ [0mRead app
+[0m→ [0mRead .clawdbot
+[0m
+Let me explore the app structure and any consumers of these APIs to understand what's expected.
+[0m
+[0m✱ [0mGrep "file-changes|agent-tasks"[90m in app · 1 match[0m
+[0m→ [0mRead app/live/LiveContext.tsx
+[0m→ [0mRead .clawdbot/active-tasks.json
+[0m→ [0mRead app/api
+[0m→ [0mRead app/api/events/route.ts
+[0m
+Now let me look at the SSE events API to understand how file-changes data flows to the frontend:
+[0m
+[0m→ [0mRead app/live
+[0m→ [0mRead app/live/agents
+[0m
+Now I have a clear picture. There are **three** places where file change detection happens, and they all have the same bug:
+
+1. **`app/api/file-changes/route.ts`** - standalone API
+2. **`app/api/agent-tasks/route.ts`** - uses `git diff --stat main..HEAD` (only last commit fallback `HEAD~1..HEAD`)
+3. **`app/api/events/route.ts`** - SSE endpoint, has its own `getFileChanges()` and `readActiveTasks()` functions
+
+The core problem: `git diff --numstat {mergeBase}..HEAD` only shows committed changes, but if the branch HEAD _is_ the merge-base (no commits yet), or if `git merge-base main HEAD` fails, it falls back to `HEAD~10` which may not make sense. Additionally, `agent-tasks/route.ts` uses `git diff --stat main..HEAD` which can fail silently and then falls back to `HEAD~1..HEAD` which only captures the last commit.
+
+Let me also check the agents page to understand the UI side:
+[0m
+[0m→ [0mRead app/live/agents/page.tsx
+[0m
+[0m# [0mTodos
+[x] Read and understand current app/api/file-changes/route.ts
+[x] Read and understand current app/api/agent-tasks/route.ts
+[x] Understand git worktree structure and data sources
+[ ] Fix file-changes API: robust committed + uncommitted + staged detection
+[ ] Add per-file details to file-changes API response
+[ ] Update agent-tasks API to use same detection method
+[ ] Update events/route.ts SSE to use same detection method
+[ ] Run npm run build to verify
+[0m
+Now I have a clear picture of the problem and all three files that need fixing. Let me create a shared utility module so all three APIs use the exact same detection logic, then update each API.
+
+The core issues are:
+1. `git diff --numstat {mergeBase}..HEAD` only captures committed changes — if `merge-base` fails or the branch has no commits yet, it falls back to `HEAD~10` (nonsensical for worktrees)
+2. `agent-tasks/route.ts` uses `git diff --stat main..HEAD` which can fail, then falls back to `HEAD~1..HEAD` (only last commit)
+3. `events/route.ts` has its own duplicate logic with the same bugs
+4. No per-file detail in agent-tasks response
+
+Let me first create the shared utility, then update all three APIs:
+[0m
+[0m→ [0mRead app/api/git/route.ts
+[0m✱ [0mGlob "app/lib/**/*"[90m 0 matches[0m
+[0m✱ [0mGlob "lib/**/*"[90m 0 matches[0m
+[0m
+Now let me create the shared utility and update all three files. First, let me check if there's a lib directory:
+[0m
+[0m$ [0mls app/
+api
+components
+favicon.ico
+globals.css
+layout.tsx
+live
+page.tsx
+[0m
+I'll create a shared utility in `app/lib/git-changes.ts` and then update all three API files:
+[0m
+[0m← [0mWrite app/lib/git-changes.ts
+Wrote file successfully.
+[0m
+Now update the file-changes API to use the shared utility:
+[0m
+[0m← [0mWrite app/api/file-changes/route.ts
+Wrote file successfully.
+[0m
+[0m# [0mTodos
+[x] Read and understand current app/api/file-changes/route.ts
+[x] Read and understand current app/api/agent-tasks/route.ts
+[x] Understand git worktree structure and data sources
+[x] Fix file-changes API: robust committed + uncommitted + staged detection
+[x] Add per-file details to file-changes API response
+[ ] Update agent-tasks API to use same detection method
+[ ] Update events/route.ts SSE to use same detection method
+[ ] Run npm run build to verify
+[0m
+Now update the agent-tasks API to use the shared utility:
+[0m
+[0m← [0mWrite app/api/agent-tasks/route.ts
+Wrote file successfully.
+[0m
+[0m# [0mTodos
+[x] Read and understand current app/api/file-changes/route.ts
+[x] Read and understand current app/api/agent-tasks/route.ts
+[x] Understand git worktree structure and data sources
+[x] Fix file-changes API: robust committed + uncommitted + staged detection
+[x] Add per-file details to file-changes API response
+[x] Update agent-tasks API to use same detection method
+[ ] Update events/route.ts SSE to use same detection method
+[ ] Run npm run build to verify
+[0m
+Now update the events/route.ts SSE endpoint. This file has duplicate `execGit`, `getFileChanges`, and `readActiveTasks` functions that need to use the shared utility:
+[0m
+[0m← [0mWrite app/api/events/route.ts
+Wrote file successfully.
+[0m
+Now I need to update the `LiveContext.tsx` `FileChangesResult` type to include the new `totalFiles` field:
+[0m
+[0m← [0mEdit app/live/LiveContext.tsx
+Index: /Users/liang/work/agent-monitor-worktrees/file-detection/app/live/LiveContext.tsx
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/file-detection/app/live/LiveContext.tsx
++++ /Users/liang/work/agent-monitor-worktrees/file-detection/app/live/LiveContext.tsx
+@@ -42,8 +42,9 @@
+ 
+ export interface FileChangesResult {
+   directory: string;
+   files: FileChange[];
++  totalFiles: number;
+   totalAdditions: number;
+   totalDeletions: number;
+ }
+ 
+
+[0m
+Now let me also check if the `AgentTask` interface in LiveContext needs `liveFiles`:
+[0m
+[0m← [0mEdit app/live/LiveContext.tsx
+Index: /Users/liang/work/agent-monitor-worktrees/file-detection/app/live/LiveContext.tsx
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/file-detection/app/live/LiveContext.tsx
++++ /Users/liang/work/agent-monitor-worktrees/file-detection/app/live/LiveContext.tsx
+@@ -27,8 +27,9 @@
+ filesChanged?: number;
+ liveFileCount?: number;
+ liveAdditions?: number;
+ liveDeletions?: number;
++liveFiles?: FileChange[];
+ summary?: string;
+ tmuxAlive: boolean;
+ worktreePath?: string;
+ tmuxSession?: string;
+
+[0m
+[0m# [0mTodos
+[x] Read and understand current app/api/file-changes/route.ts
+[x] Read and understand current app/api/agent-tasks/route.ts
+[x] Understand git worktree structure and data sources
+[x] Fix file-changes API: robust committed + uncommitted + staged detection
+[x] Add per-file details to file-changes API response
+[x] Update agent-tasks API to use same detection method
+[x] Update events/route.ts SSE to use same detection method
+[ ] Run npm run build to verify
+[0m
+[0m$ [0mnpm run build 2>&1
+> agent-monitor@0.1.0 build
+> next build
+
+▲ Next.js 16.1.6 (Turbopack)
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 1786.6ms
+  Running TypeScript ...
+  Collecting page data using 9 workers ...
+  Generating static pages using 9 workers (0/14) ...
+  Generating static pages using 9 workers (3/14) 
+  Generating static pages using 9 workers (6/14) 
+  Generating static pages using 9 workers (10/14) 
+✓ Generating static pages using 9 workers (14/14) in 141.2ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ƒ /api/agent-log
+├ ƒ /api/agent-tasks
+├ ƒ /api/config
+├ ƒ /api/events
+├ ƒ /api/file-changes
+├ ƒ /api/git
+├ ƒ /api/git-diff
+├ ƒ /api/health
+├ ƒ /api/prompts
+├ ƒ /api/sessions
+├ ○ /live
+├ ○ /live/agent
+├ ○ /live/agents
+├ ○ /live/architecture
+├ ○ /live/files
+├ ○ /live/git
+├ ○ /live/monitoring
+├ ○ /live/prompt
+├ ○ /live/tasks
+└ ○ /live/timeline
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+[0m
+Build passes cleanly. Let me also check that other files consuming `FileChangesResult` (like the files page) are compatible with the new `totalFiles` field:
+[0m
+[0m✱ [0mGrep "FileChangesResult|totalFiles|liveFiles"[90m in app · 11 matches[0m
+[0m
+Let me check the files page and main page to make sure they handle the new `totalFiles` properly:
+[0m
+[0m→ [0mRead app/live/page.tsx[90m [offset=230, limit=30][0m
+[0m
+Good - the main page uses `fileChanges[key].files.length` which still works since we didn't change the `files` array structure. The new `totalFiles` field is additive/compatible.
+[0m
+[0m# [0mTodos
+[x] Read and understand current app/api/file-changes/route.ts
+[x] Read and understand current app/api/agent-tasks/route.ts
+[x] Understand git worktree structure and data sources
+[x] Fix file-changes API: robust committed + uncommitted + staged detection
+[x] Add per-file details to file-changes API response
+[x] Update agent-tasks API to use same detection method
+[x] Update events/route.ts SSE to use same detection method
+[x] Run npm run build to verify
+[0m
+All done. Build passes cleanly. Here's a summary of what was changed:
+
+## Changes made
+
+### New file: `app/lib/git-changes.ts`
+Shared utility with a robust `getFileChanges()` function used by all three APIs. The detection uses a 4-strategy fallback chain for committed changes:
+
+1. `git merge-base main HEAD` -- standard case
+2. `git merge-base origin/main HEAD` -- worktrees where local `main` branch doesn't exist
+3. `git log --reverse HEAD --not main` -- find the fork point via log
+4. `git rev-list --max-parents=0 HEAD` -- last resort: diff against root commit
+
+Plus three additional layers for uncommitted work:
+- `git diff --cached --numstat` -- staged changes
+- `git diff --numstat` -- unstaged changes
+- `git ls-files --others --exclude-standard` -- untracked files
+
+### Updated: `app/api/file-changes/route.ts`
+Replaced inline git logic with a call to the shared `getFileChanges()`. Response now includes `totalFiles` and per-file details (`path`, `additions`, `deletions`).
+
+### Updated: `app/api/agent-tasks/route.ts`
+- Replaced the old `git diff --stat main..HEAD || git diff --stat HEAD~1..HEAD` approach with the shared `getFileChanges()`.
+- Now returns `liveFiles` array with per-file details alongside `liveFileCount`/`liveAdditions`/`liveDeletions` -- all computed from the same function the file-changes API uses.
+
+### Updated: `app/api/events/route.ts` (SSE)
+- Removed duplicate inline `getFileChanges()` and `execGit()` functions.
+- Both `readActiveTasks()` and `collectData()` now use the shared utility, so SSE-pushed file counts match what the direct APIs return.
+
+### Updated: `app/live/LiveContext.tsx`
+- Added `totalFiles` to `FileChangesResult` interface
+- Added `liveFiles?: FileChange[]` to `AgentTask` interface
+
+### Root cause fixed
+The old code used `git diff {mergeBase}..HEAD` which fails when:
+- The worktree's branch has committed changes but `git merge-base main HEAD` fails (no local `main` in worktree)
+- The branch has no commits yet (merge-base = HEAD, so diff is empty)
+- `git diff --stat main..HEAD` fails and falls back to `HEAD~1..HEAD` which only captures the last commit
+[0m

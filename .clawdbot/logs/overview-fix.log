@@ -1,0 +1,180 @@
+[0m
+> build · claude-opus-4.6
+[0m
+[0m# [0mTodos
+[ ] Fix header overlapped by navbar - add padding-top to main container in app/live/page.tsx
+[ ] Fix Event Log empty on first load - seed initial events from task data in LiveContext.tsx
+[ ] Add dark scrollbar CSS to app/globals.css
+[ ] Run npm run build to verify
+[0m
+I'll start by reading the relevant files to understand the current state of the code.
+[0m
+[0m→ [0mRead app/live/page.tsx
+[0m→ [0mRead app/live/LiveContext.tsx
+[0m→ [0mRead app/globals.css
+[0m
+[0m# [0mTodos
+[ ] Fix header overlapped by navbar - add padding-top to main container in app/live/page.tsx
+[ ] Fix Event Log empty on first load - seed initial events from task data in LiveContext.tsx
+[x] Add dark scrollbar CSS to app/globals.css
+[ ] Run npm run build to verify
+[0m
+Good, I've read all three files. Let me now apply the fixes.
+
+**Issue 1**: The main container at line 269 has `pt-6` which isn't enough to clear the navbar. I'll change it to `pt-20`.
+
+**Issue 2**: I need to add a `seededRef` in `LiveContext.tsx` to seed initial events from task data on the first SSE update.
+
+**Issue 3**: The scrollbar CSS already exists in `globals.css` (lines 37-50) with the exact styling described. This is already done.
+
+Let me apply the first two fixes:
+[0m
+[0m← [0mEdit app/live/page.tsx
+Index: /Users/liang/work/agent-monitor-worktrees/overview-fix/app/live/page.tsx
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/overview-fix/app/live/page.tsx
++++ /Users/liang/work/agent-monitor-worktrees/overview-fix/app/live/page.tsx
+@@ -265,9 +265,9 @@
+   [sseEventsCount, activeAgents, totalTasks, totalCommits]
+ );
+ 
+ return (
+-  <div className="p-4 md:p-8 pt-6 space-y-8 max-w-7xl mx-auto">
++  <div className="p-4 md:p-8 pt-20 space-y-8 max-w-7xl mx-auto">
+     {/* ── MISSION CONTROL Hero ─────────────────────────────────────────── */}
+     <motion.div
+       initial={{ opacity: 0, y: -30 }}
+       animate={{ opacity: 1, y: 0 }}
+
+[0m
+[0m# [0mTodos
+[x] Fix header overlapped by navbar - add padding-top to main container in app/live/page.tsx
+[ ] Fix Event Log empty on first load - seed initial events from task data in LiveContext.tsx
+[x] Add dark scrollbar CSS to app/globals.css
+[ ] Run npm run build to verify
+[0m
+Now for Issue 2. I need to add a `seededRef` that seeds initial events from task data on the first SSE update. The seeding should happen once when the first SSE update arrives with tasks, generating a log entry for each existing task.
+[0m
+[0m← [0mEdit app/live/LiveContext.tsx
+Index: /Users/liang/work/agent-monitor-worktrees/overview-fix/app/live/LiveContext.tsx
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/overview-fix/app/live/LiveContext.tsx
++++ /Users/liang/work/agent-monitor-worktrees/overview-fix/app/live/LiveContext.tsx
+@@ -140,8 +140,9 @@
+ const [gitInput, setGitInput] = useState("");
+ const [gitData, setGitData] = useState<Record<string, GitInfo>>({});
+ const logEndRef = useRef<HTMLDivElement>(null);
+ const eventIdRef = useRef(0);
++const seededRef = useRef(false);
+ 
+ const [sseEventsCount, setSseEventsCount] = useState(0);
+ const [connectionTime] = useState(() => Date.now());
+ const [uptime, setUptime] = useState("0s");
+
+[0m
+Now I need to add the seeding logic inside the SSE `onmessage` handler, right after the tasks are processed. When the first SSE update with tasks arrives and `seededRef` is false, seed an event for each task:
+[0m
+[0m← [0mEdit app/live/LiveContext.tsx
+Index: /Users/liang/work/agent-monitor-worktrees/overview-fix/app/live/LiveContext.tsx
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/overview-fix/app/live/LiveContext.tsx
++++ /Users/liang/work/agent-monitor-worktrees/overview-fix/app/live/LiveContext.tsx
+@@ -247,11 +247,20 @@
+ setSseEventsCount((prev) => prev + 1);
+ 
+ // Update tasks from SSE if present — diff to generate events
+ if (data.tasks && Array.isArray(data.tasks)) {
++  const newTasks = data.tasks as AgentTask[];
++
++  // Seed initial events from existing task data on first SSE update
++  if (!seededRef.current && newTasks.length > 0) {
++    seededRef.current = true;
++    for (const task of newTasks) {
++      addLog("agent", `Task ${task.id}: status is ${task.status}`);
++    }
++  }
++
+   setTasks((prevTasks) => {
+     const prevMap = new Map(prevTasks.map(t => [t.id, t]));
+-    const newTasks = data.tasks as AgentTask[];
+     for (const task of newTasks) {
+       const prev = prevMap.get(task.id);
+       if (!prev) {
+         addLog("agent", `Task spawned: ${task.id} (${task.agent})`);
+
+[0m
+[0m# [0mTodos
+[x] Fix header overlapped by navbar - add padding-top to main container in app/live/page.tsx
+[x] Fix Event Log empty on first load - seed initial events from task data in LiveContext.tsx
+[x] Add dark scrollbar CSS to app/globals.css
+[ ] Run npm run build to verify
+[0m
+[0m$ [0mnpm run build 2>&1
+> agent-monitor@0.1.0 build
+> next build
+
+▲ Next.js 16.1.6 (Turbopack)
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 1920.5ms
+  Running TypeScript ...
+  Collecting page data using 9 workers ...
+  Generating static pages using 9 workers (0/14) ...
+  Generating static pages using 9 workers (3/14) 
+  Generating static pages using 9 workers (6/14) 
+  Generating static pages using 9 workers (10/14) 
+✓ Generating static pages using 9 workers (14/14) in 146.6ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ƒ /api/agent-log
+├ ƒ /api/agent-tasks
+├ ƒ /api/config
+├ ƒ /api/events
+├ ƒ /api/file-changes
+├ ƒ /api/git
+├ ƒ /api/git-diff
+├ ƒ /api/health
+├ ƒ /api/prompts
+├ ƒ /api/sessions
+├ ○ /live
+├ ○ /live/agent
+├ ○ /live/agents
+├ ○ /live/architecture
+├ ○ /live/files
+├ ○ /live/git
+├ ○ /live/monitoring
+├ ○ /live/prompt
+├ ○ /live/tasks
+└ ○ /live/timeline
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+[0m
+Build succeeded with no errors.
+[0m
+[0m# [0mTodos
+[x] Fix header overlapped by navbar - add padding-top to main container in app/live/page.tsx
+[x] Fix Event Log empty on first load - seed initial events from task data in LiveContext.tsx
+[x] Add dark scrollbar CSS to app/globals.css
+[x] Run npm run build to verify
+[0m
+All three issues are resolved. Here's a summary:
+
+### Issue 1: Header overlapped by navbar
+- **File**: `app/live/page.tsx:269`
+- **Fix**: Changed `pt-6` to `pt-20` on the main container div, giving enough clearance below the sticky navbar.
+
+### Issue 2: Event Log empty on first load
+- **File**: `app/live/LiveContext.tsx:143` (new `seededRef`) and `:249-255` (seeding logic)
+- **Fix**: Added a `seededRef` that gates a one-time seed on the first SSE update. When the first update arrives with tasks, it logs `Task {id}: status is {status}` for each existing task. The ref ensures this only happens once, preventing spam on subsequent updates.
+
+### Issue 3: Dark scrollbar CSS
+- **File**: `app/globals.css:37-50`
+- **Status**: Already present — 6px webkit scrollbars with slate colors (`#0a0a1a` track, `#1e293b` thumb, `#334155` hover) and `border-radius: 3px`. No changes needed.
+
+Build passes cleanly with no TypeScript or compilation errors.
+[0m
