@@ -543,6 +543,7 @@ export default function LiveDashboard() {
                     <button
                       onClick={() => removeGitDir(dir)}
                       className="text-slate-600 hover:text-red-400 text-xs transition-colors"
+                      aria-label={`Remove watched directory ${dir}`}
                     >
                       x
                     </button>
