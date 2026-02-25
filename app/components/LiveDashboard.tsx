@@ -7,12 +7,13 @@ import { motion, AnimatePresence } from "framer-motion";
 
 interface Session {
   key?: string;
-  session_key?: string;
-  agent?: string;
-  model?: string;
+  sessionId?: string;
+  agentId?: string;
   age?: string;
-  tokens_used?: number;
-  status?: string;
+  ageMs?: number;
+  chatType?: string;
+  channel?: string;
+  updatedAt?: number;
 }
 
 interface HealthData {
@@ -75,7 +76,7 @@ export default function LiveDashboard() {
     gateway: "unknown",
   });
   const [eventLog, setEventLog] = useState<EventLogEntry[]>([]);
-  const [gitDirs, setGitDirs] = useState<string[]>([]);
+  const [gitDirs, setGitDirs] = useState<string[]>(["/Users/liang/work/agent-monitor"]);
   const [gitInput, setGitInput] = useState("");
   const [gitData, setGitData] = useState<Record<string, GitInfo>>({});
   const [expandedSession, setExpandedSession] = useState<string | null>(null);
@@ -246,8 +247,8 @@ export default function LiveDashboard() {
         {/* Gateway */}
         <StatusPill
           label="Gateway"
-          value={health.gateway ?? health.status}
-          ok={health.status === "healthy"}
+          value={connected ? "connected" : "disconnected"}
+          ok={connected}
         />
         <StatusPill
           label="Sessions"
@@ -257,13 +258,15 @@ export default function LiveDashboard() {
         <StatusPill
           label="Agents"
           value={String(
-            new Set(sessions.map((s) => s.agent).filter(Boolean)).size
+            new Set(sessions.map((s) => s.agentId).filter(Boolean)).size
           )}
           ok={true}
         />
-        {health.uptime && (
-          <StatusPill label="Uptime" value={health.uptime} ok={true} />
-        )}
+        <StatusPill
+          label="Active"
+          value={String(sessions.filter(s => (s.ageMs ?? 999999) < 300000).length)}
+          ok={sessions.filter(s => (s.ageMs ?? 999999) < 300000).length > 0}
+        />
       </motion.div>
 
       {/* ── 2. Active Sessions ──────────────────────────────────────────── */}
@@ -288,16 +291,16 @@ export default function LiveDashboard() {
                   <tr className="border-b border-slate-800/50 text-slate-500">
                     <th className="text-left px-4 py-2">Session</th>
                     <th className="text-left px-4 py-2">Agent</th>
-                    <th className="text-left px-4 py-2">Model</th>
+                    <th className="text-left px-4 py-2">Channel</th>
+                    <th className="text-left px-4 py-2">Type</th>
                     <th className="text-left px-4 py-2">Age</th>
-                    <th className="text-right px-4 py-2">Tokens</th>
                     <th className="text-left px-4 py-2">Status</th>
                   </tr>
                 </thead>
                 <tbody>
                   <AnimatePresence>
                     {sessions.map((s, i) => {
-                      const key = s.key ?? s.session_key ?? `s-${i}`;
+                      const key = s.key ?? `s-${i}`;
                       const isExpanded = expandedSession === key;
                       return (
                         <motion.tr
@@ -310,25 +313,29 @@ export default function LiveDashboard() {
                             setExpandedSession(isExpanded ? null : key)
                           }
                           className={`border-b border-slate-800/30 cursor-pointer hover:bg-slate-800/30 transition-colors ${
-                            getAgentColor(s.agent ?? "")
+                            getAgentColor(s.agentId ?? "")
                           }`}
                         >
-                          <td className="px-4 py-2 truncate max-w-[200px]">
-                            {key}
+                          <td className="px-4 py-2 truncate max-w-[250px]">
+                            {key.replace(/^agent:\w+:/, '')}
                           </td>
-                          <td className="px-4 py-2">{s.agent ?? "—"}</td>
+                          <td className="px-4 py-2 font-semibold">{s.agentId ?? "?"}</td>
                           <td className="px-4 py-2 text-slate-400">
-                            {s.model ?? "—"}
+                            {s.channel ?? "?"}
                           </td>
                           <td className="px-4 py-2 text-slate-400">
-                            {s.age ?? "—"}
+                            {s.chatType ?? "?"}
                           </td>
-                          <td className="px-4 py-2 text-right text-slate-400">
-                            {s.tokens_used?.toLocaleString() ?? "—"}
+                          <td className="px-4 py-2 text-slate-400">
+                            {s.age ?? "?"}
                           </td>
                           <td className="px-4 py-2">
-                            <span className="px-2 py-0.5 rounded text-[10px] bg-green-500/10 text-green-400 border border-green-500/20">
-                              {s.status ?? "active"}
+                            <span className={`px-2 py-0.5 rounded text-[10px] border ${
+                              (s.ageMs ?? 999999) < 300000
+                                ? "bg-green-500/10 text-green-400 border-green-500/20"
+                                : "bg-slate-500/10 text-slate-400 border-slate-500/20"
+                            }`}>
+                              {(s.ageMs ?? 999999) < 300000 ? "active" : "idle"}
                             </span>
                           </td>
                         </motion.tr>
