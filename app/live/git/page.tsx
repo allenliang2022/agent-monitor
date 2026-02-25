@@ -4,6 +4,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLive } from "../LiveContext";
 import type { GitCommit } from "../LiveContext";
+import { GitSkeleton, useMinimumLoading } from "../components/LoadingSkeleton";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -480,7 +481,9 @@ export default function GitPage() {
     gitData,
     handleAddGitDir,
     removeGitDir,
+    initialLoading,
   } = useLive();
+  const dataReady = useMinimumLoading(!initialLoading);
 
   // Track active tab by directory path (persists across data refreshes)
   const [activeDir, setActiveDir] = useState<string | null>(null);
@@ -501,6 +504,18 @@ export default function GitPage() {
 
   return (
     <div className="p-4 md:p-8 space-y-6">
+      {!dataReady ? (
+        <div className="space-y-6">
+          <div className="space-y-2">
+            <div className="h-4 w-32 rounded bg-slate-800/60 animate-pulse" />
+          </div>
+          <div className="flex gap-2">
+            <div className="flex-1 h-10 rounded-lg bg-slate-800/60 animate-pulse" />
+            <div className="h-10 w-20 rounded-lg bg-slate-800/60 animate-pulse" />
+          </div>
+          <GitSkeleton />
+        </div>
+      ) : (
       <motion.section
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -651,6 +666,7 @@ export default function GitPage() {
           </div>
         )}
       </motion.section>
+      )}
     </div>
   );
 }

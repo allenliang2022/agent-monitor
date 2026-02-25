@@ -4,6 +4,7 @@ import { useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLive } from "../LiveContext";
 import type { AgentTask } from "../LiveContext";
+import { CardListSkeleton, useMinimumLoading } from "../components/LoadingSkeleton";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -423,7 +424,8 @@ function SpawnTaskModal({ open, onClose }: SpawnModalProps) {
 // ─── Page ───────────────────────────────────────────────────────────────────
 
 export default function TasksPage() {
-  const { tasks } = useLive();
+  const { tasks, initialLoading } = useLive();
+  const dataReady = useMinimumLoading(!initialLoading);
   const [spawnOpen, setSpawnOpen] = useState(false);
 
   const running = tasks.filter((t) => t.status === "running");
@@ -431,6 +433,29 @@ export default function TasksPage() {
   const history = tasks.filter(
     (t) => t.status === "completed" || t.status === "failed" || t.status === "done" || t.status === "dead" || t.status === "unknown"
   );
+
+  if (!dataReady) {
+    return (
+      <div className="p-4 md:p-8 space-y-8">
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="flex gap-4">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="h-4 w-20 rounded bg-slate-800/60 animate-pulse" />
+            ))}
+          </div>
+          <div className="ml-auto h-8 w-24 rounded-lg bg-slate-800/60 animate-pulse" />
+        </div>
+        <div className="space-y-2">
+          <div className="h-4 w-20 rounded bg-slate-800/60 animate-pulse" />
+          <CardListSkeleton count={2} />
+        </div>
+        <div className="space-y-2">
+          <div className="h-4 w-24 rounded bg-slate-800/60 animate-pulse" />
+          <CardListSkeleton count={2} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 md:p-8 space-y-8">

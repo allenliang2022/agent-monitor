@@ -107,6 +107,7 @@ export interface HealthData {
 
 interface LiveContextValue {
   connected: boolean;
+  initialLoading: boolean;
   tasks: AgentTask[];
   fileChanges: Record<string, FileChangesResult>;
   eventLog: EventLogEntry[];
@@ -135,6 +136,7 @@ export function useLive(): LiveContextValue {
 
 export function LiveProvider({ children }: { children: ReactNode }) {
   const [connected, setConnected] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [tasks, setTasks] = useState<AgentTask[]>([]);
   const [fileChanges, setFileChanges] = useState<Record<string, FileChangesResult>>({});
   const [eventLog, setEventLog] = useState<EventLogEntry[]>([]);
@@ -172,6 +174,8 @@ export function LiveProvider({ children }: { children: ReactNode }) {
       }
     } catch {
       // silently retry next interval
+    } finally {
+      setInitialLoading(false);
     }
   }, []);
 
@@ -357,6 +361,7 @@ export function LiveProvider({ children }: { children: ReactNode }) {
 
   const value: LiveContextValue = {
     connected,
+    initialLoading,
     tasks,
     fileChanges,
     eventLog,

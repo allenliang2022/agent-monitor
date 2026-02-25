@@ -476,42 +476,113 @@ export default function LiveOverviewPage() {
         <h2 className="text-sm font-mono text-emerald-400 mb-3 flex items-center gap-2">
           <span className="text-emerald-400/50">&gt;</span> Event Log
         </h2>
-        <div className="bg-slate-900/50 border border-slate-700 rounded-lg p-3 h-64 overflow-y-auto font-mono text-[11px]">
-          {eventLog.length === 0 && (
-            <p className="text-slate-400">Waiting for events...</p>
-          )}
-          <AnimatePresence>
-            {eventLog.map((entry) => (
+
+        {totalTasks === 0 && eventLog.length === 0 ? (
+          /* ── Empty State ─────────────────────────────────────────────── */
+          <div className="relative bg-slate-900/50 border border-slate-700 rounded-xl p-10 flex flex-col items-center justify-center text-center overflow-hidden">
+            {/* Subtle pulsing background glow */}
+            <motion.div
+              animate={{ opacity: [0.03, 0.08, 0.03] }}
+              transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+              className="absolute inset-0 bg-gradient-to-br from-cyan-400/10 via-transparent to-purple-500/10 pointer-events-none"
+            />
+
+            {/* Animated terminal icon */}
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+              className="relative mb-6"
+            >
               <motion.div
-                key={entry.id}
-                initial={{ opacity: 0, y: 5 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="flex gap-3 py-0.5"
+                animate={{ y: [0, -4, 0] }}
+                transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
               >
-                <span className="text-slate-400 shrink-0">
-                  {new Date(entry.timestamp).toLocaleTimeString()}
-                </span>
-                <span
-                  className={`shrink-0 w-16 ${
-                    entry.type === "error" || entry.type === "git-error"
-                      ? "text-red-400"
-                      : entry.type === "system"
-                        ? "text-amber-400"
-                        : entry.type === "agent"
-                          ? "text-cyan-400"
-                          : entry.type === "git"
-                            ? "text-purple-500"
-                            : "text-slate-400"
-                  }`}
-                >
-                  [{entry.type}]
-                </span>
-                <span className="text-slate-300">{entry.message}</span>
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-cyan-400/15 to-purple-500/15 border border-cyan-400/20 flex items-center justify-center">
+                  <svg className="w-8 h-8 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="m6.75 7.5 3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0 0 21 18V6a2.25 2.25 0 0 0-2.25-2.25H5.25A2.25 2.25 0 0 0 3 6v12a2.25 2.25 0 0 0 2.25 2.25Z" />
+                  </svg>
+                </div>
               </motion.div>
-            ))}
-          </AnimatePresence>
-          <div ref={logEndRef} />
-        </div>
+              {/* Pulse ring */}
+              <motion.div
+                animate={{ scale: [1, 1.4, 1], opacity: [0.3, 0, 0.3] }}
+                transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                className="absolute inset-0 rounded-2xl border border-cyan-400/20"
+              />
+            </motion.div>
+
+            <motion.h3
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.35 }}
+              className="text-lg font-semibold text-slate-200 mb-2"
+            >
+              Ready to orchestrate
+            </motion.h3>
+
+            <motion.p
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.45 }}
+              className="text-sm font-mono text-slate-400 mb-6 max-w-sm"
+            >
+              Spawn your first agent task to see the dashboard come alive
+            </motion.p>
+
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.55 }}
+            >
+              <Link
+                href="/live/tasks"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-500/25 hover:border-cyan-500/50 transition-all font-mono text-sm font-semibold group"
+              >
+                <span className="text-base leading-none group-hover:scale-110 transition-transform">+</span>
+                New Task
+              </Link>
+            </motion.div>
+          </div>
+        ) : (
+          /* ── Normal Event Log ────────────────────────────────────────── */
+          <div className="bg-slate-900/50 border border-slate-700 rounded-lg p-3 h-64 overflow-y-auto font-mono text-[11px]">
+            {eventLog.length === 0 && (
+              <p className="text-slate-400">Waiting for events...</p>
+            )}
+            <AnimatePresence>
+              {eventLog.map((entry) => (
+                <motion.div
+                  key={entry.id}
+                  initial={{ opacity: 0, y: 5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex gap-3 py-0.5"
+                >
+                  <span className="text-slate-400 shrink-0">
+                    {new Date(entry.timestamp).toLocaleTimeString()}
+                  </span>
+                  <span
+                    className={`shrink-0 w-16 ${
+                      entry.type === "error" || entry.type === "git-error"
+                        ? "text-red-400"
+                        : entry.type === "system"
+                          ? "text-amber-400"
+                          : entry.type === "agent"
+                            ? "text-cyan-400"
+                            : entry.type === "git"
+                              ? "text-purple-500"
+                              : "text-slate-400"
+                    }`}
+                  >
+                    [{entry.type}]
+                  </span>
+                  <span className="text-slate-300">{entry.message}</span>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+            <div ref={logEndRef} />
+          </div>
+        )}
       </motion.section>
 
       {/* ── Navigation Cards ─────────────────────────────────────────────── */}
