@@ -503,13 +503,13 @@ export default function LiveTimelinePage() {
   );
 
   return (
-    <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-6 flex flex-col h-[calc(100vh-4rem)]">
+    <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-6 flex flex-col h-[calc(100vh-6.5rem)]">
       {/* ── Header ───────────────────────────────────────────────────────── */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}
-        className="flex items-center justify-between shrink-0"
+        className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0"
       >
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold">
@@ -547,7 +547,7 @@ export default function LiveTimelinePage() {
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, delay: 0.1 }}
-        className="flex items-center gap-2 shrink-0"
+        className="flex items-center gap-2 shrink-0 flex-wrap"
       >
         <span className="text-xs font-mono text-slate-500 mr-1">&gt; FILTER</span>
         {FILTER_OPTIONS.map(({ key, label }) => (
