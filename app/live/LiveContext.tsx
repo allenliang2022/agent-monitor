@@ -141,6 +141,7 @@ export function LiveProvider({ children }: { children: ReactNode }) {
   const [gitData, setGitData] = useState<Record<string, GitInfo>>({});
   const logEndRef = useRef<HTMLDivElement>(null);
   const eventIdRef = useRef(0);
+  const seededRef = useRef(false);
 
   const [sseEventsCount, setSseEventsCount] = useState(0);
   const [connectionTime] = useState(() => Date.now());
@@ -247,9 +248,18 @@ export function LiveProvider({ children }: { children: ReactNode }) {
 
             // Update tasks from SSE if present — diff to generate events
             if (data.tasks && Array.isArray(data.tasks)) {
+              const newTasks = data.tasks as AgentTask[];
+
+              // Seed initial events from existing task data on first SSE update
+              if (!seededRef.current && newTasks.length > 0) {
+                seededRef.current = true;
+                for (const task of newTasks) {
+                  addLog("agent", `Task ${task.id}: status is ${task.status}`);
+                }
+              }
+
               setTasks((prevTasks) => {
                 const prevMap = new Map(prevTasks.map(t => [t.id, t]));
-                const newTasks = data.tasks as AgentTask[];
                 for (const task of newTasks) {
                   const prev = prevMap.get(task.id);
                   if (!prev) {
