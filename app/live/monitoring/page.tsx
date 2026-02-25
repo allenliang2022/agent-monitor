@@ -561,64 +561,99 @@ export default function LiveMonitoringPage() {
         )}
       </motion.div>
 
-      {/* Stage summary cards — with timing info */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {[
-          { label: "Running", stages: ["coding"], color: "text-purple-500", bgColor: "bg-purple-500/10", borderColor: "border-purple-500/20" },
-          { label: "In CI", stages: ["ci"], color: "text-amber-400", bgColor: "bg-amber-400/10", borderColor: "border-amber-400/20" },
-          { label: "In Review", stages: ["review"], color: "text-cyan-400", bgColor: "bg-cyan-400/10", borderColor: "border-cyan-400/20" },
-          { label: "Merged", stages: ["merge"], color: "text-emerald-400", bgColor: "bg-emerald-400/10", borderColor: "border-emerald-400/20" },
-        ].map((card) => {
-          const stageTasks = card.stages.flatMap((st) => tasksByStage[st] || []);
-          const count = stageTasks.length;
-          const timing = card.stages.length > 0 ? timingByStage[card.stages[0]] : null;
+      {/* Summary stats — cumulative counts from all tasks */}
+      {(() => {
+        // Compute cumulative stats from all tasks (not just current stage positions)
+        const totalTasks = tasks.length;
+        const runningCount = tasks.filter((t) => t.status === "running").length;
+        const completedCount = tasks.filter((t) => t.status === "completed" || t.status === "done").length;
+        const failedCount = tasks.filter((t) => t.status === "failed" || t.status === "dead").length;
+        const pendingCount = tasks.filter((t) => t.status === "pending").length;
+        const ciCount = tasks.filter((t) => t.status === "ci_pending" || t.status === "ci_failed").length;
+        const reviewCount = tasks.filter((t) => t.status === "ready_for_review").length;
 
+        const finishedCount = completedCount + failedCount;
+        const successRate = finishedCount > 0 ? Math.round((completedCount / finishedCount) * 100) : null;
+
+        const allZero = totalTasks === 0;
+
+        if (allZero) {
           return (
-            <div
-              key={card.label}
-              className={`rounded-xl border ${card.borderColor} ${card.bgColor} p-4`}
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+              className="rounded-xl border border-slate-800/50 bg-slate-900/40 p-8 text-center"
             >
-              <div className="flex items-center justify-between mb-1">
-                <div className="text-xs font-mono text-slate-500 uppercase tracking-wider">
+              <div className="text-slate-600 text-sm font-mono mb-2">No tasks yet</div>
+              <p className="text-[10px] font-mono text-slate-700">
+                Spawn an agent from the Tasks page to see monitoring data here
+              </p>
+            </motion.div>
+          );
+        }
+
+        const cards = [
+          {
+            label: "Total",
+            count: totalTasks,
+            sub: pendingCount > 0 ? `${pendingCount} pending` : null,
+            color: "text-slate-300",
+            bgColor: "bg-slate-500/10",
+            borderColor: "border-slate-500/20",
+          },
+          {
+            label: "Running",
+            count: runningCount,
+            sub: ciCount > 0 ? `${ciCount} in CI` : reviewCount > 0 ? `${reviewCount} in review` : null,
+            color: "text-purple-500",
+            bgColor: "bg-purple-500/10",
+            borderColor: "border-purple-500/20",
+          },
+          {
+            label: "Completed",
+            count: completedCount,
+            sub: failedCount > 0 ? `${failedCount} failed` : null,
+            color: "text-emerald-400",
+            bgColor: "bg-emerald-400/10",
+            borderColor: "border-emerald-400/20",
+          },
+          {
+            label: "Success Rate",
+            count: successRate !== null ? `${successRate}%` : "--",
+            sub: finishedCount > 0 ? `${finishedCount} finished` : "no finished tasks",
+            color: successRate !== null && successRate >= 80 ? "text-emerald-400" : successRate !== null && successRate >= 50 ? "text-amber-400" : successRate !== null ? "text-red-400" : "text-slate-500",
+            bgColor: successRate !== null && successRate >= 80 ? "bg-emerald-400/10" : successRate !== null && successRate >= 50 ? "bg-amber-400/10" : successRate !== null ? "bg-red-400/10" : "bg-slate-500/10",
+            borderColor: successRate !== null && successRate >= 80 ? "border-emerald-400/20" : successRate !== null && successRate >= 50 ? "border-amber-400/20" : successRate !== null ? "border-red-400/20" : "border-slate-500/20",
+          },
+        ];
+
+        return (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {cards.map((card) => (
+              <motion.div
+                key={card.label}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+                className={`rounded-xl border ${card.borderColor} ${card.bgColor} p-4`}
+              >
+                <div className="text-xs font-mono text-slate-500 uppercase tracking-wider mb-1">
                   {card.label}
                 </div>
-                {timing?.duration && (
-                  <div className="text-[10px] font-mono text-slate-500">
-                    {timing.duration}
+                <div className={`text-2xl font-mono font-bold ${card.color}`}>
+                  {card.count}
+                </div>
+                {card.sub && (
+                  <div className="text-[10px] font-mono text-slate-500 mt-1">
+                    {card.sub}
                   </div>
                 )}
-              </div>
-              <div className={`text-2xl font-mono font-bold ${card.color}`}>
-                {count}
-              </div>
-              {/* Show task names */}
-              {stageTasks.length > 0 && (
-                <div className="mt-2 pt-2 border-t border-slate-700/50 space-y-0.5">
-                  {stageTasks.slice(0, 3).map((task) => (
-                    <div key={task.id} className="flex items-center gap-1.5">
-                      <span className={`w-1 h-1 rounded-full ${card.bgColor}`} style={{ opacity: 0.8 }} />
-                      <span className="text-[10px] font-mono text-slate-400 truncate">
-                        {task.name || task.id}
-                      </span>
-                    </div>
-                  ))}
-                  {stageTasks.length > 3 && (
-                    <div className="text-[10px] font-mono text-slate-500 pl-2.5">
-                      +{stageTasks.length - 3} more
-                    </div>
-                  )}
-                </div>
-              )}
-              {/* Timestamp */}
-              {timing?.lastEnteredTime && (
-                <div className="text-[9px] font-mono text-slate-600 mt-1.5">
-                  last @ {timing.lastEnteredTime}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+              </motion.div>
+            ))}
+          </div>
+        );
+      })()}
     </div>
   );
 }

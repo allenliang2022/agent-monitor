@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLive } from "../LiveContext";
 import type { AgentTask } from "../LiveContext";
@@ -170,10 +171,260 @@ function TaskCard({ task, index }: { task: AgentTask; index: number }) {
   );
 }
 
+// ─── Spawn Task Modal ───────────────────────────────────────────────────────
+
+interface SpawnModalProps {
+  open: boolean;
+  onClose: () => void;
+}
+
+function SpawnTaskModal({ open, onClose }: SpawnModalProps) {
+  const [taskId, setTaskId] = useState("");
+  const [description, setDescription] = useState("");
+  const [prompt, setPrompt] = useState("");
+  const [agent, setAgent] = useState("opencode");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+
+  const resetForm = useCallback(() => {
+    setTaskId("");
+    setDescription("");
+    setPrompt("");
+    setAgent("opencode");
+    setError(null);
+    setSuccess(false);
+  }, []);
+
+  const handleClose = useCallback(() => {
+    if (!submitting) {
+      resetForm();
+      onClose();
+    }
+  }, [submitting, resetForm, onClose]);
+
+  const handleSubmit = useCallback(async () => {
+    setError(null);
+
+    // Client-side validation
+    if (!taskId.trim()) {
+      setError("Task ID is required");
+      return;
+    }
+    if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(taskId.trim())) {
+      setError("Task ID must be kebab-case (e.g. fix-header-bug)");
+      return;
+    }
+    if (!description.trim()) {
+      setError("Description is required");
+      return;
+    }
+    if (!prompt.trim()) {
+      setError("Prompt is required");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/spawn-task", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: taskId.trim(),
+          description: description.trim(),
+          prompt: prompt.trim(),
+          agent,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        setError(
+          data.errors?.join(", ") || data.stderr || "Failed to spawn task"
+        );
+        return;
+      }
+
+      setSuccess(true);
+      setTimeout(() => {
+        resetForm();
+        onClose();
+      }, 1500);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Network error");
+    } finally {
+      setSubmitting(false);
+    }
+  }, [taskId, description, prompt, agent, resetForm, onClose]);
+
+  if (!open) return null;
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+        >
+          {/* Backdrop */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={handleClose}
+          />
+
+          {/* Modal */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            transition={{ duration: 0.2 }}
+            className="relative w-full max-w-lg bg-slate-900 border border-slate-700 rounded-xl shadow-2xl overflow-hidden"
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800">
+              <h2 className="text-sm font-mono font-bold text-cyan-400 flex items-center gap-2">
+                <span className="text-cyan-400/50">&gt;</span> Spawn New Task
+              </h2>
+              <button
+                onClick={handleClose}
+                className="text-slate-500 hover:text-slate-300 transition-colors text-lg font-mono leading-none"
+              >
+                x
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="px-5 py-4 space-y-4 max-h-[70vh] overflow-y-auto">
+              {/* Success message */}
+              {success && (
+                <motion.div
+                  initial={{ opacity: 0, y: -8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-green-500/10 border border-green-500/20 rounded-lg px-4 py-3 text-sm font-mono text-green-400"
+                >
+                  Task spawned successfully. Redirecting...
+                </motion.div>
+              )}
+
+              {/* Error message */}
+              {error && (
+                <motion.div
+                  initial={{ opacity: 0, y: -8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3 text-sm font-mono text-red-400"
+                >
+                  {error}
+                </motion.div>
+              )}
+
+              {/* Task ID */}
+              <div>
+                <label className="block text-[10px] font-mono text-slate-500 uppercase tracking-wider mb-1.5">
+                  Task ID <span className="text-red-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={taskId}
+                  onChange={(e) => setTaskId(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
+                  placeholder="fix-header-bug"
+                  disabled={submitting || success}
+                  className="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2 text-sm font-mono text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 disabled:opacity-50 transition-colors"
+                />
+                <p className="text-[10px] font-mono text-slate-600 mt-1">
+                  kebab-case only (a-z, 0-9, hyphens)
+                </p>
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block text-[10px] font-mono text-slate-500 uppercase tracking-wider mb-1.5">
+                  Description <span className="text-red-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Fix the responsive header layout"
+                  disabled={submitting || success}
+                  className="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2 text-sm font-mono text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 disabled:opacity-50 transition-colors"
+                />
+              </div>
+
+              {/* Prompt */}
+              <div>
+                <label className="block text-[10px] font-mono text-slate-500 uppercase tracking-wider mb-1.5">
+                  Prompt <span className="text-red-400">*</span>
+                </label>
+                <textarea
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  placeholder={"Detailed instructions for the agent...\n\nSupports markdown."}
+                  disabled={submitting || success}
+                  rows={6}
+                  className="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2 text-sm font-mono text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 disabled:opacity-50 transition-colors resize-y min-h-[120px]"
+                />
+              </div>
+
+              {/* Agent Type */}
+              <div>
+                <label className="block text-[10px] font-mono text-slate-500 uppercase tracking-wider mb-1.5">
+                  Agent Type
+                </label>
+                <select
+                  value={agent}
+                  onChange={(e) => setAgent(e.target.value)}
+                  disabled={submitting || success}
+                  className="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2 text-sm font-mono text-slate-200 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 disabled:opacity-50 transition-colors appearance-none"
+                >
+                  <option value="opencode">opencode</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-end gap-3 px-5 py-4 border-t border-slate-800">
+              <button
+                onClick={handleClose}
+                disabled={submitting}
+                className="px-4 py-2 text-xs font-mono text-slate-400 hover:text-slate-200 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmit}
+                disabled={submitting || success}
+                className="px-4 py-2 text-xs font-mono font-semibold rounded-lg bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-500/25 hover:border-cyan-500/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {submitting ? (
+                  <>
+                    <span className="inline-block w-3 h-3 border-2 border-cyan-400/30 border-t-cyan-400 rounded-full animate-spin" />
+                    Spawning...
+                  </>
+                ) : success ? (
+                  "Spawned"
+                ) : (
+                  "Spawn Task"
+                )}
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
 // ─── Page ───────────────────────────────────────────────────────────────────
 
 export default function TasksPage() {
   const { tasks } = useLive();
+  const [spawnOpen, setSpawnOpen] = useState(false);
 
   const running = tasks.filter((t) => t.status === "running");
   const pending = tasks.filter((t) => t.status === "pending");
@@ -212,7 +463,16 @@ export default function TasksPage() {
             {history.filter((t) => t.status === "failed").length}
           </span>
         </span>
-        <span className="ml-auto text-slate-600">auto-refresh 5s</span>
+
+        {/* Spawn Button */}
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.97 }}
+          onClick={() => setSpawnOpen(true)}
+          className="ml-auto px-3 py-1.5 text-xs font-mono font-semibold rounded-lg bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-500/25 hover:border-cyan-500/50 transition-all flex items-center gap-2"
+        >
+          <span className="text-base leading-none">+</span> New Task
+        </motion.button>
       </motion.div>
 
       {/* ── Running Tasks ────────────────────────────────────────────────── */}
@@ -299,6 +559,9 @@ export default function TasksPage() {
           </div>
         )}
       </motion.section>
+
+      {/* ── Spawn Task Modal ─────────────────────────────────────────────── */}
+      <SpawnTaskModal open={spawnOpen} onClose={() => setSpawnOpen(false)} />
     </div>
   );
 }
