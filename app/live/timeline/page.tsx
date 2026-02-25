@@ -200,7 +200,40 @@ export default function LiveTimelinePage() {
   // Diff tasks on each SSE update
   useEffect(() => {
     if (!initializedRef.current) {
-      // First load: snapshot the current state, don't generate events
+      // First load: seed timeline with existing data
+      const seedEvents: TimelineEvent[] = [];
+
+      // Seed from existing tasks
+      for (const task of tasks) {
+        seedEvents.push({
+          id: `spawn-${task.id}-seed`,
+          timestamp: task.startedAt || new Date().toISOString(),
+          type: "agent_spawned",
+          title: `Agent spawned: ${task.name || task.id}`,
+          detail: `${task.agent} started task "${task.description || task.name}" on branch ${task.branch || "unknown"}`,
+          rawData: { ...task } as unknown as Record<string, unknown>,
+        });
+      }
+
+      // Seed from existing git commits
+      for (const [dir, info] of Object.entries(gitData)) {
+        const commits = info.recentCommits || [];
+        for (const commit of commits) {
+          seedEvents.push({
+            id: `commit-${commit.hash}-seed`,
+            timestamp: commit.time || new Date().toISOString(),
+            type: "commit_pushed",
+            title: `Commit: ${commit.message?.slice(0, 80) || commit.hash.slice(0, 8)}`,
+            detail: `${commit.author || "unknown"} committed ${commit.hash.slice(0, 8)} in ${dir.split("/").pop()}`,
+            rawData: { ...commit, directory: dir },
+          });
+        }
+      }
+
+      // Sort by timestamp descending
+      seedEvents.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      setEvents(seedEvents.slice(0, MAX_EVENTS));
+
       prevTasksRef.current = tasks;
       const commitMap = new Map<string, Set<string>>();
       for (const [dir, info] of Object.entries(gitData)) {

@@ -60,8 +60,9 @@ interface DiagramEdge {
 export default function LiveArchitecturePage() {
   const { tasks } = useLive();
 
-  const activeTasks = useMemo(() => tasks.filter((t) => t.status !== "completed" && t.status !== "done"), [tasks]);
-  const hasAgents = activeTasks.length > 0;
+  const activeTasks = useMemo(() => tasks.filter((t) => t.tmuxAlive), [tasks]);
+  const allAgentTasks = useMemo(() => tasks, [tasks]);
+  const hasAgents = allAgentTasks.length > 0;
 
   // Build dynamic nodes
   const { nodes, edges } = useMemo(() => {
@@ -82,14 +83,14 @@ export default function LiveArchitecturePage() {
 
     edgeList.push({ from: "allen", to: "nova", label: "Feishu", color: "#fbbf24", animated: true });
 
-    if (hasAgents) {
+    if (allAgentTasks.length > 0) {
       // Distribute agent nodes evenly
       const agentY = 220;
       const worktreeY = 380;
-      const spacing = Math.min(180, 700 / Math.max(activeTasks.length, 1));
-      const startX = novaX - ((activeTasks.length - 1) * spacing) / 2;
+      const spacing = Math.min(180, 700 / Math.max(allAgentTasks.length, 1));
+      const startX = novaX - ((allAgentTasks.length - 1) * spacing) / 2;
 
-      activeTasks.forEach((task, i) => {
+      allAgentTasks.forEach((task, i) => {
         const ax = startX + i * spacing;
         const agentId = `agent-${task.id}`;
         const wtId = `wt-${task.id}`;
@@ -130,7 +131,7 @@ export default function LiveArchitecturePage() {
     }
 
     return { nodes: nodeList, edges: edgeList };
-  }, [activeTasks, hasAgents]);
+  }, [allAgentTasks, hasAgents]);
 
   // Compute viewbox height based on content
   const viewH = hasAgents ? 460 : 200;
@@ -333,9 +334,9 @@ export default function LiveArchitecturePage() {
       {/* Summary cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { label: "Active Agents", value: activeTasks.filter((t) => t.tmuxAlive).length, color: "text-cyan-400", bgColor: "bg-cyan-400/10", borderColor: "border-cyan-400/20" },
-          { label: "Dead Agents", value: activeTasks.filter((t) => !t.tmuxAlive).length, color: "text-red-400", bgColor: "bg-red-400/10", borderColor: "border-red-400/20" },
-          { label: "Worktrees", value: activeTasks.length, color: "text-emerald-400", bgColor: "bg-emerald-400/10", borderColor: "border-emerald-400/20" },
+          { label: "Active Agents", value: activeTasks.length, color: "text-cyan-400", bgColor: "bg-cyan-400/10", borderColor: "border-cyan-400/20" },
+          { label: "Dead Agents", value: allAgentTasks.filter((t) => !t.tmuxAlive).length, color: "text-red-400", bgColor: "bg-red-400/10", borderColor: "border-red-400/20" },
+          { label: "Worktrees", value: allAgentTasks.length, color: "text-emerald-400", bgColor: "bg-emerald-400/10", borderColor: "border-emerald-400/20" },
           { label: "Total Tasks", value: tasks.length, color: "text-purple-500", bgColor: "bg-purple-500/10", borderColor: "border-purple-500/20" },
         ].map((card) => (
           <motion.div
@@ -355,7 +356,7 @@ export default function LiveArchitecturePage() {
       </div>
 
       {/* Agent details list */}
-      {activeTasks.length > 0 && (
+      {allAgentTasks.length > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -366,7 +367,7 @@ export default function LiveArchitecturePage() {
             <h3 className="text-sm font-mono font-bold text-slate-300">Agent Details</h3>
           </div>
           <div className="divide-y divide-slate-800/50">
-            {activeTasks.map((task) => (
+            {allAgentTasks.map((task) => (
               <div key={task.id} className="px-4 py-3 flex items-center gap-4 text-xs font-mono">
                 <span className={`w-2 h-2 rounded-full ${task.tmuxAlive ? "bg-emerald-400" : "bg-red-400"}`} />
                 <span className="text-slate-300 min-w-[100px]">{task.name || task.id}</span>

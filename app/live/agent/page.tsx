@@ -1,42 +1,38 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useLive } from "../LiveContext";
 
-// ─── Simulated terminal lines for when agent is active ─────────────────────
+// ─── Real agent log hook ────────────────────────────────────────────────────
 
-function useTerminalOutput(taskId: string | null) {
+function useAgentLog(taskId: string | null) {
   const [lines, setLines] = useState<string[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
+  const fetchLog = useCallback(async () => {
     if (!taskId) {
       setLines([]);
       return;
     }
-
-    // Initial boot lines
-    const bootLines = [
-      `\x1b[36m[agent]\x1b[0m Initializing session for task ${taskId}...`,
-      `\x1b[36m[agent]\x1b[0m Reading prompt file...`,
-      `\x1b[36m[agent]\x1b[0m Analyzing codebase structure...`,
-      `\x1b[36m[agent]\x1b[0m Agent process active in tmux session`,
-      `\x1b[32m[ready]\x1b[0m Waiting for live output stream...`,
-    ];
-    setLines(bootLines);
-
-    // Simulate periodic output
-    const interval = setInterval(() => {
-      const now = new Date().toLocaleTimeString();
-      setLines((prev) => [
-        ...prev.slice(-200),
-        `\x1b[90m[${now}]\x1b[0m heartbeat: agent process alive`,
-      ]);
-    }, 8000);
-
-    return () => clearInterval(interval);
+    try {
+      const res = await fetch(`/api/agent-log?task=${encodeURIComponent(taskId)}`);
+      const data = await res.json();
+      if (data.lines && Array.isArray(data.lines)) {
+        setLines(data.lines);
+      } else if (data.error) {
+        setLines([`# ${data.error}`]);
+      }
+    } catch {
+      setLines(["# Failed to fetch agent log"]);
+    }
   }, [taskId]);
+
+  useEffect(() => {
+    fetchLog();
+    const interval = setInterval(fetchLog, 3000);
+    return () => clearInterval(interval);
+  }, [fetchLog]);
 
   // Auto-scroll
   useEffect(() => {
@@ -46,20 +42,20 @@ function useTerminalOutput(taskId: string | null) {
   return { lines, scrollRef };
 }
 
-// ─── Terminal line renderer (basic ANSI to classes) ─────────────────────────
+// ─── Terminal line renderer ─────────────────────────────────────────────────
 
 function TerminalLine({ text }: { text: string }) {
-  // Strip ANSI and apply simple coloring based on prefix
-  const clean = text.replace(/\x1b\[\d+m/g, "");
+  // Strip ANSI codes
+  const clean = text.replace(/\x1b\[\d+m/g, "").replace(/\x1b\[[\d;]*[A-Za-z]/g, "");
 
   let colorClass = "text-slate-400";
-  if (clean.includes("[agent]")) colorClass = "text-cyan-400";
-  else if (clean.includes("[ready]")) colorClass = "text-green-400";
-  else if (clean.includes("[error]")) colorClass = "text-red-400";
-  else if (clean.includes("[warn]")) colorClass = "text-amber-400";
-  else if (clean.includes("heartbeat")) colorClass = "text-slate-600";
+  if (clean.startsWith("#") || clean.toLowerCase().includes("error")) colorClass = "text-red-400";
+  else if (clean.toLowerCase().includes("warn")) colorClass = "text-amber-400";
+  else if (clean.includes("success") || clean.includes("passed") || clean.includes("done") || clean.includes("✅")) colorClass = "text-green-400";
+  else if (clean.startsWith("$") || clean.startsWith(">") || clean.includes("[agent]")) colorClass = "text-cyan-400";
+  else if (clean.includes("Todo") || clean.includes("[ ]")) colorClass = "text-purple-400";
 
-  return <div className={`${colorClass} leading-relaxed`}>{clean}</div>;
+  return <div className={`${colorClass} leading-relaxed`}>{clean || "\u00A0"}</div>;
 }
 
 // ─── Page ───────────────────────────────────────────────────────────────────
@@ -67,13 +63,34 @@ function TerminalLine({ text }: { text: string }) {
 export default function AgentPage() {
   const { tasks, eventLog } = useLive();
 
-  const currentTask = tasks.find((t) => t.status === "running") ?? null;
-  const recentCompleted = tasks
-    .filter((t) => t.status === "completed")
-    .slice(-5)
-    .reverse();
+  // Find current or most recent task
+  const runningTask = tasks.find((t) => t.status === "running");
+  const latestTask = runningTask ?? tasks.sort((a, b) => {
+    const aTime = new Date(a.startedAt).getTime();
+    const bTime = new Date(b.startedAt).getTime();
+    return bTime - aTime;
+  })[0] ?? null;
 
-  const { lines, scrollRef } = useTerminalOutput(currentTask?.id ?? null);
+  const [selectedTaskId, setSelectedTaskId] = useState<string>("");
+
+  // Auto-select running task, or latest
+  useEffect(() => {
+    if (runningTask) {
+      setSelectedTaskId(runningTask.id);
+    } else if (!selectedTaskId && latestTask) {
+      setSelectedTaskId(latestTask.id);
+    }
+  }, [runningTask, latestTask, selectedTaskId]);
+
+  const selectedTask = tasks.find((t) => t.id === selectedTaskId) ?? latestTask;
+  const isActive = selectedTask?.tmuxAlive || selectedTask?.status === "running";
+
+  const { lines, scrollRef } = useAgentLog(selectedTask?.id ?? null);
+
+  const recentCompleted = tasks
+    .filter((t) => t.status === "completed" || t.status === "done")
+    .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())
+    .slice(0, 5);
 
   return (
     <div className="p-4 md:p-8 space-y-6">
@@ -88,68 +105,89 @@ export default function AgentPage() {
 
         <motion.div
           className={`bg-slate-900/50 border rounded-xl p-5 backdrop-blur-sm ${
-            currentTask
+            isActive
               ? "border-cyan-500/20 shadow-[0_0_20px_rgba(0,212,255,0.06)]"
               : "border-slate-800/50"
           }`}
-          whileHover={{ scale: 1.002 }}
         >
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
-              {currentTask && (
+              {isActive && (
                 <span className="relative flex h-2.5 w-2.5">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75" />
                   <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-cyan-400" />
                 </span>
               )}
               <span className="font-mono font-semibold text-sm text-cyan-400">
-                opencode
+                {selectedTask?.agent ?? "opencode"}
               </span>
               <span className="text-[10px] font-mono text-slate-600">
                 (coding agent)
               </span>
             </div>
-            <span
-              className={`text-[10px] font-mono px-2.5 py-0.5 rounded-full border ${
-                currentTask
-                  ? "bg-green-500/10 text-green-400 border-green-500/20"
-                  : "bg-slate-500/10 text-slate-500 border-slate-500/20"
-              }`}
-            >
-              {currentTask ? "ACTIVE" : "IDLE"}
-            </span>
+
+            <div className="flex items-center gap-2">
+              {/* Task selector */}
+              {tasks.length > 1 && (
+                <select
+                  value={selectedTaskId}
+                  onChange={(e) => setSelectedTaskId(e.target.value)}
+                  className="bg-slate-800/50 border border-slate-700 rounded-lg px-2 py-1 text-[10px] font-mono text-slate-300 focus:outline-none focus:border-cyan-400/50"
+                >
+                  {tasks.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name || t.id} ({t.status})
+                    </option>
+                  ))}
+                </select>
+              )}
+
+              <span
+                className={`text-[10px] font-mono px-2.5 py-0.5 rounded-full border ${
+                  isActive
+                    ? "bg-green-500/10 text-green-400 border-green-500/20"
+                    : selectedTask?.status === "completed" || selectedTask?.status === "done"
+                    ? "bg-blue-500/10 text-blue-400 border-blue-500/20"
+                    : selectedTask?.status === "failed" || selectedTask?.status === "ci_failed"
+                    ? "bg-red-500/10 text-red-400 border-red-500/20"
+                    : "bg-slate-500/10 text-slate-500 border-slate-500/20"
+                }`}
+              >
+                {isActive ? "ACTIVE" : selectedTask?.tmuxAlive === false ? "DEAD" : (selectedTask?.status?.toUpperCase() ?? "IDLE")}
+              </span>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs font-mono">
             <div>
               <span className="text-slate-600 text-[10px] block">TASK</span>
               <span className="text-slate-300">
-                {currentTask?.name ?? "\u2014"}
+                {selectedTask?.name || selectedTask?.description || selectedTask?.id || "\u2014"}
               </span>
             </div>
             <div>
               <span className="text-slate-600 text-[10px] block">MODEL</span>
               <span className="text-slate-300">
-                {currentTask?.model ?? "claude-opus-4.6"}
+                {selectedTask?.model ?? "claude-opus-4.6"}
               </span>
             </div>
             <div>
-              <span className="text-slate-600 text-[10px] block">PROMPT</span>
-              <span className="text-slate-300">
-                {currentTask?.promptFile ?? "\u2014"}
+              <span className="text-slate-600 text-[10px] block">BRANCH</span>
+              <span className="text-amber-400">
+                {selectedTask?.branch || "\u2014"}
               </span>
             </div>
             <div>
-              <span className="text-slate-600 text-[10px] block">COMPLETED</span>
+              <span className="text-slate-600 text-[10px] block">FILES</span>
               <span className="text-green-400">
-                {tasks.filter((t) => t.status === "completed").length}
+                {selectedTask?.filesChanged !== undefined ? selectedTask.filesChanged : "\u2014"}
               </span>
             </div>
           </div>
         </motion.div>
       </motion.section>
 
-      {/* ── Terminal Output ───────────────────────────────────────────────── */}
+      {/* ── Terminal Output (real agent logs) ─────────────────────────────── */}
       <motion.section
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -158,10 +196,13 @@ export default function AgentPage() {
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-mono text-cyan-400 flex items-center gap-2">
             <span className="text-cyan-400/50">&gt;</span> Live Output
+            <span className="text-[10px] text-slate-600">
+              ({lines.length} lines)
+            </span>
           </h2>
-          {currentTask && (
+          {selectedTask && (
             <span className="text-[10px] font-mono text-slate-600">
-              tmux: agent-{currentTask.id}
+              tmux: {selectedTask.tmuxSession || `agent-${selectedTask.id}`} | log: .clawdbot/logs/{selectedTask.id}.log
             </span>
           )}
         </div>
@@ -173,54 +214,53 @@ export default function AgentPage() {
             <span className="w-2.5 h-2.5 rounded-full bg-amber-500/60" />
             <span className="w-2.5 h-2.5 rounded-full bg-green-500/60" />
             <span className="ml-3 text-[10px] font-mono text-slate-600">
-              {currentTask
-                ? `agent@swarm ~ task:${currentTask.id}`
-                : "agent@swarm ~ (idle)"}
+              {selectedTask
+                ? `agent@swarm ~ task:${selectedTask.id} (${isActive ? "live" : "finished"})`
+                : "agent@swarm ~ (no task selected)"}
             </span>
           </div>
 
           {/* Terminal body */}
-          <div className="bg-[#0c0c1a] p-4 h-80 overflow-y-auto font-mono text-[11px] leading-relaxed scrollbar-thin scrollbar-track-slate-900 scrollbar-thumb-slate-700">
-            {currentTask ? (
+          <div className="bg-[#0c0c1a] p-4 h-96 overflow-y-auto font-mono text-[11px] leading-relaxed scrollbar-thin scrollbar-track-slate-900 scrollbar-thumb-slate-700">
+            {lines.length > 0 ? (
               <>
-                <div className="text-slate-600 mb-2">
-                  $ opencode --task {currentTask.id} --prompt{" "}
-                  {currentTask.promptFile ?? "default"}
-                </div>
                 <AnimatePresence>
                   {lines.map((line, i) => (
                     <motion.div
-                      key={i}
-                      initial={{ opacity: 0, x: -5 }}
+                      key={`${selectedTaskId}-${i}`}
+                      initial={i > lines.length - 5 ? { opacity: 0, x: -5 } : false}
                       animate={{ opacity: 1, x: 0 }}
-                      transition={{ duration: 0.2 }}
+                      transition={{ duration: 0.15 }}
                     >
                       <TerminalLine text={line} />
                     </motion.div>
                   ))}
                 </AnimatePresence>
 
-                {/* Blinking cursor */}
-                <div className="flex items-center gap-1 mt-2">
-                  <span className="text-green-400">$</span>
-                  <motion.span
-                    animate={{ opacity: [1, 0] }}
-                    transition={{
-                      duration: 0.8,
-                      repeat: Infinity,
-                      repeatType: "reverse",
-                    }}
-                    className="inline-block w-2 h-4 bg-green-400/80"
-                  />
-                </div>
+                {/* Blinking cursor for active tasks */}
+                {isActive && (
+                  <div className="flex items-center gap-1 mt-2">
+                    <span className="text-green-400">$</span>
+                    <motion.span
+                      animate={{ opacity: [1, 0] }}
+                      transition={{
+                        duration: 0.8,
+                        repeat: Infinity,
+                        repeatType: "reverse",
+                      }}
+                      className="inline-block w-2 h-4 bg-green-400/80"
+                    />
+                  </div>
+                )}
                 <div ref={scrollRef} />
               </>
             ) : (
               <div className="flex flex-col items-center justify-center h-full text-slate-600 gap-2">
                 <span className="text-2xl opacity-30">$_</span>
                 <span className="text-xs">
-                  No active agent process. Output will appear here when a task
-                  is running.
+                  {selectedTask
+                    ? "No log output yet. Waiting for agent to produce output..."
+                    : "No active agent process. Spawn a task to see live output."}
                 </span>
               </div>
             )}
@@ -228,7 +268,7 @@ export default function AgentPage() {
         </div>
       </motion.section>
 
-      {/* ── Event Feed (from SSE, agent-related) ─────────────────────────── */}
+      {/* ── Event Feed ───────────────────────────────────────────────────── */}
       <motion.section
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -245,9 +285,7 @@ export default function AgentPage() {
           ) : (
             <div className="space-y-0.5">
               {eventLog
-                .filter(
-                  (e) => e.type === "agent" || e.type === "system"
-                )
+                .filter((e) => e.type === "agent" || e.type === "system")
                 .slice(-20)
                 .map((entry) => (
                   <div key={entry.id} className="flex gap-3">
@@ -296,22 +334,22 @@ export default function AgentPage() {
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.05 }}
-                  className="bg-slate-900/40 border border-green-500/10 rounded-lg p-3"
-                  whileHover={{ scale: 1.003 }}
+                  className="bg-slate-900/40 border border-green-500/10 rounded-lg p-3 cursor-pointer hover:border-green-500/30 transition-colors"
+                  onClick={() => setSelectedTaskId(task.id)}
                 >
                   <div className="flex items-center justify-between mb-1">
                     <span className="font-mono text-xs text-green-400">
-                      {task.name}
+                      {task.name || task.id}
                     </span>
                     <span className="text-[10px] font-mono px-2 py-0.5 rounded-full border bg-green-500/10 text-green-400 border-green-500/20">
                       DONE
                     </span>
                   </div>
                   <div className="flex flex-wrap gap-4 text-[10px] font-mono text-slate-500">
+                    {task.branch && <span className="text-amber-400/70">{task.branch}</span>}
                     {task.commit && (
                       <span>
-                        commit:{" "}
-                        <span className="text-amber-400">{task.commit}</span>
+                        commit: <span className="text-amber-400">{task.commit}</span>
                       </span>
                     )}
                     {task.filesChanged !== undefined && (

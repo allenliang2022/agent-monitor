@@ -77,6 +77,10 @@ if [ -n "${INSTALL_PID:-}" ]; then
   wait $INSTALL_PID 2>/dev/null || true
 fi
 
+# Save prompt to prompts directory
+mkdir -p "$CLAWDBOT/prompts"
+echo "$PROMPT" > "$CLAWDBOT/prompts/$TASK_ID.md"
+
 # Kill existing tmux session
 tmux kill-session -t "$TMUX_SESSION" 2>/dev/null || true
 

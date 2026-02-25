@@ -26,12 +26,16 @@ export default function LivePromptPage() {
   // Active tasks for the dropdown
   const activeTasks = tasks.filter((t) => t.status === "running" || t.status === "pending" || t.status === "ci_pending");
 
-  // Auto-select first active task when tasks change
+  // Auto-select first task (prefer running, fallback to any)
   useEffect(() => {
-    if (!selectedTask && activeTasks.length > 0) {
-      setSelectedTask(activeTasks[0].id);
+    if (!selectedTask) {
+      if (activeTasks.length > 0) {
+        setSelectedTask(activeTasks[0].id);
+      } else if (tasks.length > 0) {
+        setSelectedTask(tasks[0].id);
+      }
     }
-  }, [activeTasks, selectedTask]);
+  }, [activeTasks, tasks, selectedTask]);
 
   // Fetch prompts
   useEffect(() => {

@@ -22,9 +22,12 @@ export interface AgentTask {
   description?: string;
   startedAt: string;
   completedAt?: string;
-  status: "running" | "completed" | "failed" | "pending" | "ci_pending" | "ci_failed" | "ready_for_review" | "done";
+  status: "running" | "completed" | "failed" | "pending" | "ci_pending" | "ci_failed" | "ready_for_review" | "done" | "dead" | "unknown";
   commit?: string;
   filesChanged?: number;
+  liveFileCount?: number;
+  liveAdditions?: number;
+  liveDeletions?: number;
   summary?: string;
   tmuxAlive: boolean;
   worktreePath?: string;
@@ -133,9 +136,7 @@ export function LiveProvider({ children }: { children: ReactNode }) {
   const [tasks, setTasks] = useState<AgentTask[]>([]);
   const [fileChanges, setFileChanges] = useState<Record<string, FileChangesResult>>({});
   const [eventLog, setEventLog] = useState<EventLogEntry[]>([]);
-  const [gitDirs, setGitDirs] = useState<string[]>([
-    "/Users/liang/work/agent-monitor",
-  ]);
+  const [gitDirs, setGitDirs] = useState<string[]>([]);
   const [gitInput, setGitInput] = useState("");
   const [gitData, setGitData] = useState<Record<string, GitInfo>>({});
   const logEndRef = useRef<HTMLDivElement>(null);
@@ -176,6 +177,23 @@ export function LiveProvider({ children }: { children: ReactNode }) {
     const interval = setInterval(fetchTasks, 5000);
     return () => clearInterval(interval);
   }, [fetchTasks]);
+
+  // ── Auto-populate git dirs from active tasks ───────────────────────────
+
+  useEffect(() => {
+    setGitDirs((prev) => {
+      const newDirs = new Set(prev);
+      // Always include main repo
+      newDirs.add("/Users/liang/work/agent-monitor");
+      // Add worktree paths from tasks
+      for (const task of tasks) {
+        if (task.worktreePath) {
+          newDirs.add(task.worktreePath);
+        }
+      }
+      return Array.from(newDirs);
+    });
+  }, [tasks]);
 
   // ── Fetch git info ──────────────────────────────────────────────────────
 
