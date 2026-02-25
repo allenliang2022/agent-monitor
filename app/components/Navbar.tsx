@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
 
-const navItems = [
+const navItems: { href: string; label: string; icon: string; live?: boolean }[] = [
   { href: "/", label: "Overview", icon: "+" },
   { href: "/timeline", label: "Timeline", icon: ">" },
   { href: "/status", label: "Status", icon: "#" },
@@ -13,6 +13,7 @@ const navItems = [
   { href: "/monitoring", label: "Monitoring", icon: "@" },
   { href: "/prompt", label: "Prompt", icon: "$" },
   { href: "/architecture", label: "Architecture", icon: "&" },
+  { href: "/live", label: "Live", icon: "*", live: true },
 ];
 
 export default function Navbar() {
@@ -40,11 +41,23 @@ export default function Navbar() {
                 {isActive && (
                   <motion.div
                     layoutId="navbar-active"
-                    className="absolute inset-0 bg-cyan-400/15 border border-cyan-400/30 rounded-md"
+                    className={`absolute inset-0 border rounded-md ${
+                      item.live
+                        ? "bg-green-400/15 border-green-400/30"
+                        : "bg-cyan-400/15 border-cyan-400/30"
+                    }`}
                     transition={{ type: "spring", bounce: 0.2, duration: 0.4 }}
                   />
                 )}
-                <span className="relative">{item.label}</span>
+                <span className="relative flex items-center gap-1.5">
+                  {item.live && (
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+                    </span>
+                  )}
+                  {item.label}
+                </span>
               </Link>
             );
           })}
