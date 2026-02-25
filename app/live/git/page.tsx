@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLive } from "../LiveContext";
 import type { GitCommit } from "../LiveContext";
@@ -365,6 +365,111 @@ function CommitNode({
   );
 }
 
+// ─── Helper: extract directory basename ────────────────────────────────────
+
+function dirBasename(dir: string): string {
+  return dir.replace(/\/+$/, "").split("/").pop() || dir;
+}
+
+// ─── Tab Content: renders a single directory's git info ────────────────────
+
+function TabContent({ dir, info }: { dir: string; info: ReturnType<typeof useLive>["gitData"][string] | undefined }) {
+  if (!info) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="flex items-center gap-2 text-xs font-mono text-slate-600">
+          <motion.span
+            animate={{ opacity: [0.3, 1, 0.3] }}
+            transition={{ duration: 1.5, repeat: Infinity }}
+          >
+            Loading git status...
+          </motion.span>
+        </div>
+      </div>
+    );
+  }
+
+  if (info.error) {
+    return (
+      <div className="flex items-center gap-2 p-3 bg-red-500/5 border border-red-500/20 rounded-lg">
+        <span className="text-red-400 text-xs">!</span>
+        <p className="text-xs font-mono text-red-400">{info.error}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid md:grid-cols-5 gap-6">
+      {/* Commit timeline (3/5 width) */}
+      <div className="md:col-span-3">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-[10px] text-slate-500 font-mono uppercase tracking-wider">
+            Recent Commits
+          </span>
+          <span className="text-[10px] text-slate-600 font-mono">
+            {info.recentCommits.length} shown &middot; click to expand
+          </span>
+        </div>
+        <div className="pl-1">
+          {info.recentCommits.length === 0 ? (
+            <p className="text-xs font-mono text-slate-600">
+              No commits found.
+            </p>
+          ) : (
+            info.recentCommits.map((c, i) => (
+              <CommitNode
+                key={c.hash}
+                commit={c}
+                index={i}
+                isLast={i === info.recentCommits.length - 1}
+                dir={dir}
+              />
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* Diff stat + status (2/5 width) */}
+      <div className="md:col-span-2 space-y-4">
+        {/* Branch & Status Summary */}
+        <div>
+          <span className="text-[10px] text-slate-500 font-mono uppercase tracking-wider block mb-2">
+            Status
+          </span>
+          <div className="bg-slate-950/40 rounded-lg p-3 space-y-2 text-xs font-mono">
+            <div className="flex justify-between">
+              <span className="text-slate-500">Branch</span>
+              <span className="text-purple-400">{info.branch}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-500">Working tree</span>
+              <span className={info.clean ? "text-green-400" : "text-amber-400"}>
+                {info.clean ? "clean" : "dirty"}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-500">Changed files</span>
+              <span className={info.changedFiles > 0 ? "text-amber-400" : "text-slate-400"}>
+                {info.changedFiles}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Diff stat */}
+        <div>
+          <span className="text-[10px] text-slate-500 font-mono uppercase tracking-wider block mb-2">
+            Diff Stat
+          </span>
+          <pre className="bg-slate-950/40 rounded-lg p-3 text-[11px] font-mono text-slate-500 whitespace-pre-wrap break-all overflow-x-auto max-h-48 scrollbar-thin scrollbar-track-slate-900 scrollbar-thumb-slate-700">
+            {info.diffStat}
+          </pre>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Page ───────────────────────────────────────────────────────────────────
 
 export default function GitPage() {
@@ -376,6 +481,23 @@ export default function GitPage() {
     handleAddGitDir,
     removeGitDir,
   } = useLive();
+
+  // Track active tab by directory path (persists across data refreshes)
+  const [activeDir, setActiveDir] = useState<string | null>(null);
+  const tabsContainerRef = useRef<HTMLDivElement>(null);
+
+  // If the active tab was removed or doesn't exist, fall back to the first dir
+  const resolvedActiveDir =
+    activeDir && gitDirs.includes(activeDir) ? activeDir : gitDirs[0] ?? null;
+
+  // Keep activeDir in sync when resolved value changes (e.g. first load)
+  useEffect(() => {
+    if (resolvedActiveDir && resolvedActiveDir !== activeDir) {
+      setActiveDir(resolvedActiveDir);
+    }
+  }, [resolvedActiveDir, activeDir]);
+
+  const activeInfo = resolvedActiveDir ? gitData[resolvedActiveDir] : undefined;
 
   return (
     <div className="p-4 md:p-8 space-y-6">
@@ -390,7 +512,7 @@ export default function GitPage() {
           </span>
         </h2>
 
-        {/* Add directory input */}
+        {/* Add directory input — global, always visible */}
         <div className="flex gap-2 mb-5">
           <input
             type="text"
@@ -413,176 +535,119 @@ export default function GitPage() {
             No watched directories. Add a path above to monitor git activity.
           </div>
         ) : (
-          <div className="grid gap-4">
-            <AnimatePresence mode="popLayout">
-              {gitDirs.map((dir) => {
-                const info = gitData[dir];
-                return (
-                  <motion.div
-                    key={dir}
-                    initial={{ opacity: 0, scale: 0.98 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.98 }}
-                    className="bg-slate-900/50 border border-slate-800/50 rounded-xl overflow-hidden backdrop-blur-sm"
-                  >
-                    {/* Directory header */}
-                    <div className="flex items-center justify-between px-5 py-3 border-b border-slate-800/30 bg-slate-900/40">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <span className="text-xs font-mono text-slate-400 truncate max-w-[400px]">
-                          {dir}
-                        </span>
-                        {info && !info.error && (
-                          <>
-                            <span className="text-[10px] font-mono px-2.5 py-0.5 rounded-full bg-purple-500/10 text-purple-300 border border-purple-500/20 shrink-0">
-                              <span className="text-purple-400/50 mr-1">~</span>
-                              {info.branch}
-                            </span>
-                            <span
-                              className={`text-[10px] font-mono px-2.5 py-0.5 rounded-full border shrink-0 ${
-                                info.clean
-                                  ? "bg-green-500/10 text-green-400 border-green-500/20"
-                                  : "bg-amber-500/10 text-amber-400 border-amber-500/20"
-                              }`}
-                            >
-                              {info.clean
-                                ? "CLEAN"
-                                : `${info.changedFiles} dirty`}
-                            </span>
-                          </>
-                        )}
-                      </div>
-                      <button
-                        onClick={() => removeGitDir(dir)}
-                        className="text-slate-600 hover:text-red-400 text-xs font-mono transition-colors ml-3 shrink-0 px-2 py-1 rounded hover:bg-red-500/10"
-                        aria-label="Remove directory"
-                      >
-                        remove
-                      </button>
-                    </div>
+          <div className="space-y-0">
+            {/* Summary bar */}
+            <div className="flex items-center gap-3 mb-3">
+              <span className="text-[10px] font-mono text-slate-500">
+                {gitDirs.length} project{gitDirs.length !== 1 && "s"}
+              </span>
+              <span className="text-[10px] font-mono text-slate-700">|</span>
+              {resolvedActiveDir && (
+                <span className="text-[10px] font-mono text-slate-600 truncate">
+                  {resolvedActiveDir}
+                </span>
+              )}
+            </div>
 
-                    {/* Content */}
-                    <div className="p-5">
+            {/* Tab bar */}
+            <div className="relative">
+              <div
+                ref={tabsContainerRef}
+                className="flex gap-1 overflow-x-auto scrollbar-none pb-px border-b border-slate-800/40"
+              >
+                {gitDirs.map((dir) => {
+                  const isActive = dir === resolvedActiveDir;
+                  const info = gitData[dir];
+                  return (
+                    <button
+                      key={dir}
+                      onClick={() => setActiveDir(dir)}
+                      className={`relative flex items-center gap-2 px-4 py-2.5 text-xs font-mono whitespace-nowrap shrink-0 transition-colors rounded-t-lg ${
+                        isActive
+                          ? "text-cyan-300 bg-slate-900/50"
+                          : "text-slate-500 hover:text-slate-300 hover:bg-slate-900/30"
+                      }`}
+                    >
+                      <span>{dirBasename(dir)}</span>
+                      {/* Status dot */}
                       {info && !info.error && (
-                        <div className="grid md:grid-cols-5 gap-6">
-                          {/* Commit timeline (3/5 width) */}
-                          <div className="md:col-span-3">
-                            <div className="flex items-center justify-between mb-3">
-                              <span className="text-[10px] text-slate-500 font-mono uppercase tracking-wider">
-                                Recent Commits
-                              </span>
-                              <span className="text-[10px] text-slate-600 font-mono">
-                                {info.recentCommits.length} shown &middot; click
-                                to expand
-                              </span>
-                            </div>
-                            <div className="pl-1">
-                              {info.recentCommits.length === 0 ? (
-                                <p className="text-xs font-mono text-slate-600">
-                                  No commits found.
-                                </p>
-                              ) : (
-                                info.recentCommits.map((c, i) => (
-                                  <CommitNode
-                                    key={c.hash}
-                                    commit={c}
-                                    index={i}
-                                    isLast={
-                                      i === info.recentCommits.length - 1
-                                    }
-                                    dir={dir}
-                                  />
-                                ))
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Diff stat + status (2/5 width) */}
-                          <div className="md:col-span-2 space-y-4">
-                            {/* Branch & Status Summary */}
-                            <div>
-                              <span className="text-[10px] text-slate-500 font-mono uppercase tracking-wider block mb-2">
-                                Status
-                              </span>
-                              <div className="bg-slate-950/40 rounded-lg p-3 space-y-2 text-xs font-mono">
-                                <div className="flex justify-between">
-                                  <span className="text-slate-500">Branch</span>
-                                  <span className="text-purple-400">
-                                    {info.branch}
-                                  </span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span className="text-slate-500">
-                                    Working tree
-                                  </span>
-                                  <span
-                                    className={
-                                      info.clean
-                                        ? "text-green-400"
-                                        : "text-amber-400"
-                                    }
-                                  >
-                                    {info.clean ? "clean" : "dirty"}
-                                  </span>
-                                </div>
-                                <div className="flex justify-between">
-                                  <span className="text-slate-500">
-                                    Changed files
-                                  </span>
-                                  <span
-                                    className={
-                                      info.changedFiles > 0
-                                        ? "text-amber-400"
-                                        : "text-slate-400"
-                                    }
-                                  >
-                                    {info.changedFiles}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Diff stat */}
-                            <div>
-                              <span className="text-[10px] text-slate-500 font-mono uppercase tracking-wider block mb-2">
-                                Diff Stat
-                              </span>
-                              <pre className="bg-slate-950/40 rounded-lg p-3 text-[11px] font-mono text-slate-500 whitespace-pre-wrap break-all overflow-x-auto max-h-48 scrollbar-thin scrollbar-track-slate-900 scrollbar-thumb-slate-700">
-                                {info.diffStat}
-                              </pre>
-                            </div>
-                          </div>
-                        </div>
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                            info.clean ? "bg-green-400/70" : "bg-amber-400/70"
+                          }`}
+                        />
                       )}
-
                       {info?.error && (
-                        <div className="flex items-center gap-2 p-3 bg-red-500/5 border border-red-500/20 rounded-lg">
-                          <span className="text-red-400 text-xs">!</span>
-                          <p className="text-xs font-mono text-red-400">
-                            {info.error}
-                          </p>
-                        </div>
+                        <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-red-400/70" />
                       )}
+                      {/* Active indicator */}
+                      {isActive && (
+                        <motion.div
+                          layoutId="git-tab-indicator"
+                          className="absolute bottom-0 left-0 right-0 h-[2px] bg-cyan-400"
+                          transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                        />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
 
-                      {!info && (
-                        <div className="flex items-center justify-center py-8">
-                          <div className="flex items-center gap-2 text-xs font-mono text-slate-600">
-                            <motion.span
-                              animate={{ opacity: [0.3, 1, 0.3] }}
-                              transition={{
-                                duration: 1.5,
-                                repeat: Infinity,
-                              }}
-                            >
-                              Loading git status...
-                            </motion.span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </AnimatePresence>
+            {/* Active tab content */}
+            {resolvedActiveDir && (
+              <div className="bg-slate-900/50 border border-slate-800/50 border-t-0 rounded-b-xl overflow-hidden backdrop-blur-sm">
+                {/* Directory header inside the content panel */}
+                <div className="flex items-center justify-between px-5 py-3 border-b border-slate-800/30 bg-slate-900/40">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className="text-xs font-mono text-slate-400 truncate max-w-[400px]">
+                      {resolvedActiveDir}
+                    </span>
+                    {activeInfo && !activeInfo.error && (
+                      <>
+                        <span className="text-[10px] font-mono px-2.5 py-0.5 rounded-full bg-purple-500/10 text-purple-300 border border-purple-500/20 shrink-0">
+                          <span className="text-purple-400/50 mr-1">~</span>
+                          {activeInfo.branch}
+                        </span>
+                        <span
+                          className={`text-[10px] font-mono px-2.5 py-0.5 rounded-full border shrink-0 ${
+                            activeInfo.clean
+                              ? "bg-green-500/10 text-green-400 border-green-500/20"
+                              : "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                          }`}
+                        >
+                          {activeInfo.clean
+                            ? "CLEAN"
+                            : `${activeInfo.changedFiles} dirty`}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => removeGitDir(resolvedActiveDir)}
+                    className="text-slate-600 hover:text-red-400 text-xs font-mono transition-colors ml-3 shrink-0 px-2 py-1 rounded hover:bg-red-500/10"
+                    aria-label="Remove directory"
+                  >
+                    remove
+                  </button>
+                </div>
+
+                {/* Tab panel */}
+                <div className="p-5">
+                  <AnimatePresence mode="wait">
+                    <motion.div
+                      key={resolvedActiveDir}
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -8 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      <TabContent dir={resolvedActiveDir} info={activeInfo} />
+                    </motion.div>
+                  </AnimatePresence>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </motion.section>
