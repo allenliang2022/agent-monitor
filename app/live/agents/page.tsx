@@ -2,6 +2,7 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect, useCallback, useMemo } from "react";
+import Link from "next/link";
 import { useLive } from "../LiveContext";
 import type { AgentTask, FileChangesResult } from "../LiveContext";
 
@@ -16,17 +17,18 @@ function stepIndex(status: AgentTask["status"]): number {
     case "running":
       return 1;
     case "ready_for_review":
-      return 2;
+      return 4; // Review stage
     case "ci_pending":
       return 3;
     case "ci_failed":
       return 3;
     case "done":
     case "completed":
-      return 5;
+      return 5; // All stages complete
     case "failed":
+      return 1; // Failed during coding
     case "dead":
-      return 1;
+      return 0; // Cancelled — only spawned
     default:
       return 0;
   }
@@ -67,6 +69,15 @@ function agentBadge(agent: string): {
 
 // ─── Status badge ───────────────────────────────────────────────────────────
 
+/**
+ * Derive a display status from the raw task data.
+ * The API already maps dead+commits → "completed" and dead+no commits → "dead".
+ * Here we translate that to user-friendly labels:
+ *  - running                → RUNNING (cyan)
+ *  - done / completed       → COMPLETED (green)
+ *  - dead (no commits)      → CANCELLED (gray)
+ *  - failed                 → FAILED (red)
+ */
 function statusBadge(status: AgentTask["status"]): {
   bg: string;
   text: string;
@@ -108,15 +119,22 @@ function statusBadge(status: AgentTask["status"]): {
         bg: "bg-emerald-400/10",
         text: "text-emerald-400",
         border: "border-emerald-400/20",
-        label: "DONE",
+        label: "COMPLETED",
       };
     case "dead":
+      // dead = tmux session gone with no commits → agent was cancelled/crashed
+      return {
+        bg: "bg-slate-600/10",
+        text: "text-slate-400",
+        border: "border-slate-600/20",
+        label: "CANCELLED",
+      };
     case "failed":
       return {
         bg: "bg-red-400/10",
         text: "text-red-400",
         border: "border-red-400/20",
-        label: status === "dead" ? "DEAD" : "FAILED",
+        label: "FAILED",
       };
     case "pending":
       return {
@@ -167,7 +185,9 @@ function useElapsedTime(startedAt: string): string {
 
 function ProgressStepper({ status }: { status: AgentTask["status"] }) {
   const current = stepIndex(status);
-  const isFailed = status === "failed" || status === "ci_failed" || status === "dead";
+  const isFailed = status === "failed" || status === "ci_failed";
+  const isCancelled = status === "dead";
+  const isComplete = status === "done" || status === "completed";
 
   return (
     <div className="flex items-center gap-1 w-full mt-3">
@@ -176,9 +196,12 @@ function ProgressStepper({ status }: { status: AgentTask["status"] }) {
         const isActive = i === current;
 
         let dotColor = "bg-slate-700";
-        if (isDone && !isFailed) dotColor = "bg-emerald-400";
-        if (isActive && isFailed) dotColor = "bg-red-400";
-        if (isActive && !isFailed) dotColor = "bg-cyan-400";
+        if (isComplete && isDone) dotColor = "bg-emerald-400";
+        else if (isCancelled && i === 0) dotColor = "bg-slate-500";
+        else if (isCancelled) dotColor = "bg-slate-700";
+        else if (isDone && !isFailed) dotColor = "bg-emerald-400";
+        else if (isActive && isFailed) dotColor = "bg-red-400";
+        else if (isActive && !isFailed) dotColor = "bg-cyan-400";
 
         return (
           <div key={step} className="flex items-center gap-1 flex-1">
@@ -186,13 +209,13 @@ function ProgressStepper({ status }: { status: AgentTask["status"] }) {
               <motion.div
                 className={`w-2.5 h-2.5 rounded-full ${dotColor}`}
                 animate={
-                  isActive && !isFailed
+                  isActive && !isFailed && !isCancelled && !isComplete
                     ? { scale: [1, 1.3, 1] }
                     : {}
                 }
                 transition={{
                   duration: 1.5,
-                  repeat: isActive && !isFailed ? Infinity : 0,
+                  repeat: isActive && !isFailed && !isCancelled && !isComplete ? Infinity : 0,
                 }}
               />
               <span className="text-[8px] font-mono text-slate-400 whitespace-nowrap">
@@ -201,7 +224,13 @@ function ProgressStepper({ status }: { status: AgentTask["status"] }) {
             </div>
             {i < STEPS.length - 1 && (
               <div
-                className={`flex-1 h-px ${isDone && i < current ? "bg-emerald-400/40" : "bg-slate-700"}`}
+                className={`flex-1 h-px ${
+                  isComplete && i < current
+                    ? "bg-emerald-400/40"
+                    : isDone && i < current && !isCancelled
+                      ? "bg-emerald-400/40"
+                      : "bg-slate-700"
+                }`}
               />
             )}
           </div>
@@ -278,6 +307,76 @@ function AgentLogViewer({ taskId }: { taskId: string }) {
   );
 }
 
+// ─── Icon Button with Tooltip ───────────────────────────────────────────────
+
+function IconButton({
+  label,
+  onClick,
+  href,
+  disabled,
+  children,
+}: {
+  label: string;
+  onClick?: () => void;
+  href?: string;
+  disabled?: boolean;
+  children: React.ReactNode;
+}) {
+  const className = `relative group flex items-center justify-center w-7 h-7 rounded-md border text-[11px] font-mono transition-all ${
+    disabled
+      ? "border-slate-700/50 text-slate-600 cursor-not-allowed opacity-50"
+      : "border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-500 hover:bg-slate-800/50"
+  }`;
+
+  const tooltip = (
+    <span className="pointer-events-none absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-slate-800 border border-slate-700 px-2 py-0.5 text-[10px] font-mono text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+      {label}
+    </span>
+  );
+
+  if (href && !disabled) {
+    return (
+      <Link href={href} className={className}>
+        {tooltip}
+        {children}
+      </Link>
+    );
+  }
+
+  return (
+    <button onClick={onClick} disabled={disabled} className={className}>
+      {tooltip}
+      {children}
+    </button>
+  );
+}
+
+// ─── SVG Icons (inline, small) ──────────────────────────────────────────────
+
+function LogsIcon() {
+  return (
+    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h12" />
+    </svg>
+  );
+}
+
+function DiffIcon() {
+  return (
+    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+    </svg>
+  );
+}
+
+function RetryIcon() {
+  return (
+    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+    </svg>
+  );
+}
+
 // ─── Agent Card ─────────────────────────────────────────────────────────────
 
 function AgentCard({
@@ -349,24 +448,32 @@ function AgentCard({
 
       {/* tmux status + branch row */}
       <div className="flex items-center gap-3 flex-wrap mb-3">
-        {/* tmux status */}
+        {/* tmux status — contextualize based on task outcome */}
         <div className="flex items-center gap-1.5">
-          <span
-            className={`relative flex h-2.5 w-2.5 rounded-full ${
-              task.tmuxAlive ? "bg-emerald-400" : "bg-red-400"
-            }`}
-          >
-            {task.tmuxAlive && (
-              <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping" />
-            )}
-          </span>
-          <span
-            className={`text-[10px] font-mono font-bold ${
-              task.tmuxAlive ? "text-emerald-400" : "text-red-400"
-            }`}
-          >
-            {task.tmuxAlive ? "ALIVE" : "DEAD"}
-          </span>
+          {task.tmuxAlive ? (
+            <>
+              <span className="relative flex h-2.5 w-2.5 rounded-full bg-emerald-400">
+                <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping" />
+              </span>
+              <span className="text-[10px] font-mono font-bold text-emerald-400">
+                ALIVE
+              </span>
+            </>
+          ) : task.status === "done" || task.status === "completed" ? (
+            <>
+              <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-400/60" />
+              <span className="text-[10px] font-mono font-bold text-emerald-400/60">
+                EXITED
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="flex h-2.5 w-2.5 rounded-full bg-slate-500" />
+              <span className="text-[10px] font-mono font-bold text-slate-500">
+                EXITED
+              </span>
+            </>
+          )}
         </div>
 
         {/* Branch */}
@@ -397,28 +504,55 @@ function AgentCard({
       {/* Mini progress stepper */}
       <ProgressStepper status={task.status} />
 
-      {/* Expand toggle */}
-      <button
-        onClick={() => setExpanded((p) => !p)}
-        className="w-full mt-3 pt-2 border-t border-slate-700/30 text-[10px] font-mono text-slate-400 hover:text-slate-200 transition-colors flex items-center justify-center gap-1"
-      >
-        <motion.svg
-          animate={{ rotate: expanded ? 180 : 0 }}
-          transition={{ duration: 0.2 }}
-          className="w-3 h-3"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={2}
+      {/* Action buttons */}
+      <div className="flex items-center gap-2 mt-3 pt-2 border-t border-slate-700/30">
+        <IconButton label="View Logs" onClick={() => setExpanded((p) => !p)}>
+          <LogsIcon />
+        </IconButton>
+        <IconButton
+          label="View Diff"
+          href={task.branch ? `/live/git?branch=${encodeURIComponent(task.branch)}` : "/live/git"}
         >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="m19.5 8.25-7.5 7.5-7.5-7.5"
-          />
-        </motion.svg>
-        {expanded ? "Hide Logs" : "Show Logs"}
-      </button>
+          <DiffIcon />
+        </IconButton>
+        <IconButton
+          label="Retry Task"
+          disabled={task.status !== "failed" && task.status !== "dead" && task.status !== "ci_failed"}
+          onClick={() => {
+            // POST to retry endpoint — fire and forget
+            fetch("/api/agent-tasks/retry", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ taskId: task.id }),
+            }).catch(() => {});
+          }}
+        >
+          <RetryIcon />
+        </IconButton>
+
+        {/* Spacer + expand hint */}
+        <button
+          onClick={() => setExpanded((p) => !p)}
+          className="ml-auto text-[10px] font-mono text-slate-400 hover:text-slate-200 transition-colors flex items-center gap-1"
+        >
+          <motion.svg
+            animate={{ rotate: expanded ? 180 : 0 }}
+            transition={{ duration: 0.2 }}
+            className="w-3 h-3"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="m19.5 8.25-7.5 7.5-7.5-7.5"
+            />
+          </motion.svg>
+          {expanded ? "Hide" : "Logs"}
+        </button>
+      </div>
 
       {/* Expanded log view */}
       <AnimatePresence>
