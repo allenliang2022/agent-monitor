@@ -22,10 +22,26 @@ export interface AgentTask {
   description?: string;
   startedAt: string;
   completedAt?: string;
-  status: "running" | "completed" | "failed" | "pending";
+  status: "running" | "completed" | "failed" | "pending" | "ci_pending" | "ci_failed" | "ready_for_review" | "done";
   commit?: string;
   filesChanged?: number;
   summary?: string;
+  tmuxAlive: boolean;
+  worktreePath?: string;
+  tmuxSession?: string;
+}
+
+export interface FileChange {
+  path: string;
+  additions: number;
+  deletions: number;
+}
+
+export interface FileChangesResult {
+  directory: string;
+  files: FileChange[];
+  totalAdditions: number;
+  totalDeletions: number;
 }
 
 export interface GitCommit {
@@ -59,6 +75,8 @@ export interface SSEUpdate {
   sessions?: { sessions?: Session[] } | Session[];
   health?: HealthData;
   message?: string;
+  tasks?: AgentTask[];
+  fileChanges?: Record<string, FileChangesResult>;
 }
 
 export interface Session {
@@ -85,6 +103,7 @@ export interface HealthData {
 interface LiveContextValue {
   connected: boolean;
   tasks: AgentTask[];
+  fileChanges: Record<string, FileChangesResult>;
   eventLog: EventLogEntry[];
   sseEventsCount: number;
   uptime: string;
@@ -112,6 +131,7 @@ export function useLive(): LiveContextValue {
 export function LiveProvider({ children }: { children: ReactNode }) {
   const [connected, setConnected] = useState(false);
   const [tasks, setTasks] = useState<AgentTask[]>([]);
+  const [fileChanges, setFileChanges] = useState<Record<string, FileChangesResult>>({});
   const [eventLog, setEventLog] = useState<EventLogEntry[]>([]);
   const [gitDirs, setGitDirs] = useState<string[]>([
     "/Users/liang/work/agent-monitor",
@@ -137,7 +157,7 @@ export function LiveProvider({ children }: { children: ReactNode }) {
     setEventLog((prev) => [...prev.slice(-200), entry]);
   }, []);
 
-  // ── Fetch agent tasks ───────────────────────────────────────────────────
+  // ── Fetch agent tasks (fallback polling, SSE is primary) ──────────────
 
   const fetchTasks = useCallback(async () => {
     try {
@@ -206,6 +226,16 @@ export function LiveProvider({ children }: { children: ReactNode }) {
 
           if (data.type === "update") {
             setSseEventsCount((prev) => prev + 1);
+
+            // Update tasks from SSE if present
+            if (data.tasks && Array.isArray(data.tasks)) {
+              setTasks(data.tasks);
+            }
+
+            // Update file changes from SSE if present
+            if (data.fileChanges) {
+              setFileChanges(data.fileChanges);
+            }
 
             // Log agent-relevant events
             if (data.message) {
@@ -289,6 +319,7 @@ export function LiveProvider({ children }: { children: ReactNode }) {
   const value: LiveContextValue = {
     connected,
     tasks,
+    fileChanges,
     eventLog,
     sseEventsCount,
     uptime,

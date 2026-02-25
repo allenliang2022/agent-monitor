@@ -5,6 +5,16 @@ import { execSync } from "child_process";
 export const dynamic = "force-dynamic";
 
 const OPENCLAW_DIR = join(process.env.HOME || "/Users/liang", ".openclaw");
+const CLAWDBOT_DIR = join(process.cwd(), ".clawdbot");
+const ACTIVE_TASKS_FILE = join(CLAWDBOT_DIR, "active-tasks.json");
+
+// Derive worktree base path from project directory
+const PROJECT_DIR = process.cwd();
+const WORKTREE_BASE = join(
+  PROJECT_DIR,
+  "..",
+  `${PROJECT_DIR.split("/").pop()}-worktrees`
+);
 
 interface RawSession {
   sessionId?: string;
@@ -12,6 +22,38 @@ interface RawSession {
   chatType?: string;
   lastChannel?: string;
   [k: string]: unknown;
+}
+
+interface RawTask {
+  id: string;
+  name?: string;
+  agent?: string;
+  model?: string;
+  promptFile?: string;
+  branch?: string;
+  description?: string;
+  startedAt?: string;
+  completedAt?: string;
+  status?: string;
+  commit?: string;
+  filesChanged?: number;
+  summary?: string;
+  worktree?: string;
+  tmuxSession?: string;
+  [key: string]: unknown;
+}
+
+interface FileChange {
+  path: string;
+  additions: number;
+  deletions: number;
+}
+
+interface FileChangesResult {
+  directory: string;
+  files: FileChange[];
+  totalAdditions: number;
+  totalDeletions: number;
 }
 
 function readSessionStore(agentId: string) {
@@ -60,6 +102,104 @@ function getGitStatus(dir: string): Record<string, unknown> | null {
   }
 }
 
+function execGit(cmd: string, cwd: string): string {
+  try {
+    return execSync(cmd, { cwd, encoding: "utf-8", timeout: 10000, stdio: "pipe" }).trim();
+  } catch {
+    return "";
+  }
+}
+
+function checkTmuxSession(sessionName: string): boolean {
+  try {
+    execSync(`tmux has-session -t ${sessionName}`, {
+      encoding: "utf-8",
+      timeout: 3000,
+      stdio: "pipe",
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function readActiveTasks() {
+  if (!existsSync(ACTIVE_TASKS_FILE)) return [];
+  try {
+    const raw = readFileSync(ACTIVE_TASKS_FILE, "utf-8");
+    const data = JSON.parse(raw);
+    const rawTasks: RawTask[] = Array.isArray(data) ? data : data.tasks || [];
+
+    return rawTasks.map((task) => {
+      const tmuxSession = task.tmuxSession || task.id || "";
+      const tmuxAlive = tmuxSession ? checkTmuxSession(tmuxSession) : false;
+      const worktreePath =
+        task.worktree || (task.id ? join(WORKTREE_BASE, task.id) : undefined);
+
+      return {
+        ...task,
+        tmuxAlive,
+        worktreePath,
+      };
+    });
+  } catch {
+    return [];
+  }
+}
+
+function getFileChanges(dir: string): FileChangesResult | null {
+  if (!existsSync(dir)) return null;
+  try {
+    let diffRef = "HEAD~10";
+    const mergeBase = execGit("git merge-base main HEAD", dir);
+    if (mergeBase) diffRef = mergeBase;
+
+    const numstat = execGit(`git diff --numstat ${diffRef}..HEAD`, dir);
+    const uncommittedNumstat = execGit("git diff --numstat", dir);
+
+    const fileMap = new Map<string, FileChange>();
+
+    const parseNumstat = (output: string) => {
+      if (!output) return;
+      for (const line of output.split("\n")) {
+        if (!line.trim()) continue;
+        const parts = line.split("\t");
+        if (parts.length < 3) continue;
+        const additions = parts[0] === "-" ? 0 : parseInt(parts[0], 10) || 0;
+        const deletions = parts[1] === "-" ? 0 : parseInt(parts[1], 10) || 0;
+        const filePath = parts[2];
+        if (!filePath) continue;
+
+        const existing = fileMap.get(filePath);
+        if (existing) {
+          existing.additions += additions;
+          existing.deletions += deletions;
+        } else {
+          fileMap.set(filePath, { path: filePath, additions, deletions });
+        }
+      }
+    };
+
+    parseNumstat(numstat);
+    parseNumstat(uncommittedNumstat);
+
+    const files = Array.from(fileMap.values()).sort(
+      (a, b) => b.additions + b.deletions - (a.additions + a.deletions)
+    );
+
+    let totalAdditions = 0;
+    let totalDeletions = 0;
+    for (const f of files) {
+      totalAdditions += f.additions;
+      totalDeletions += f.deletions;
+    }
+
+    return { directory: dir, files, totalAdditions, totalDeletions };
+  } catch {
+    return null;
+  }
+}
+
 function collectData() {
   const agents = ["main", "girlfriend", "xiaolongnv"];
   const cutoff = Date.now() - 60 * 60 * 1000;
@@ -80,11 +220,27 @@ function collectData() {
     gitStatuses[dir] = getGitStatus(dir);
   }
 
+  // Read active tasks with tmux status
+  const tasks = readActiveTasks();
+
+  // Collect file changes for each task's worktree
+  const fileChanges: Record<string, FileChangesResult> = {};
+  for (const task of tasks) {
+    if (task.worktreePath && existsSync(task.worktreePath)) {
+      const changes = getFileChanges(task.worktreePath);
+      if (changes) {
+        fileChanges[task.worktreePath] = changes;
+      }
+    }
+  }
+
   return {
     type: "update",
     timestamp: new Date().toISOString(),
     sessions: { count: allSessions.length, sessions: allSessions },
     git: gitStatuses,
+    tasks,
+    fileChanges,
   };
 }
 
