@@ -22,7 +22,7 @@ export default function AnimationDistribution() {
           className="mb-10"
         >
           <h2 className="text-2xl sm:text-3xl font-bold">
-            <span className="bg-gradient-to-r from-amber to-purple bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-amber-400 to-purple-500 bg-clip-text text-transparent">
               Animation Distribution
             </span>
           </h2>
@@ -44,12 +44,12 @@ export default function AnimationDistribution() {
               >
                 <div className="flex items-center gap-4">
                   <div className="w-44 shrink-0 text-right">
-                    <span className="font-mono text-sm text-slate-400 group-hover:text-cyan transition-colors">
+                    <span className="font-mono text-sm text-slate-400 group-hover:text-cyan-400 transition-colors">
                       {item.component}
                     </span>
                   </div>
 
-                  <div className="flex-1 relative h-8 bg-slate-800/50 rounded-lg overflow-hidden border border-slate-700/30 group-hover:border-cyan/20 transition-colors">
+                  <div className="flex-1 relative h-8 bg-slate-800/50 rounded-lg overflow-hidden border border-slate-700/30 group-hover:border-cyan-400/20 transition-colors">
                     <motion.div
                       initial={{ width: 0 }}
                       animate={isInView ? { width: `${percentage}%` } : { width: 0 }}
@@ -63,7 +63,7 @@ export default function AnimationDistribution() {
                       initial={{ width: 0 }}
                       animate={isInView ? { width: `${percentage}%` } : { width: 0 }}
                       transition={{ delay: 0.3 + i * 0.06, duration: 0.8, ease: "easeOut" }}
-                      className="absolute inset-y-0 left-0 rounded-lg border-r-2 border-cyan/60"
+                      className="absolute inset-y-0 left-0 rounded-lg border-r-2 border-cyan-400/60"
                       style={{
                         background: `linear-gradient(90deg, rgba(0,212,255,0.1), rgba(0,212,255,0.05))`,
                       }}
@@ -75,7 +75,7 @@ export default function AnimationDistribution() {
                       initial={{ opacity: 0 }}
                       animate={isInView ? { opacity: 1 } : {}}
                       transition={{ delay: 0.8 + i * 0.06 }}
-                      className="font-mono text-sm font-bold text-cyan"
+                      className="font-mono text-sm font-bold text-cyan-400"
                     >
                       {item.calls}
                     </motion.span>
@@ -98,7 +98,7 @@ export default function AnimationDistribution() {
             Avg: {Math.round(sessionData.result.animationCalls / data.length)} calls/component
           </span>
           <span className="text-sm text-slate-500 font-mono">
-            Total: <span className="text-amber font-bold">{sessionData.result.animationCalls}</span> motion calls
+            Total: <span className="text-amber-400 font-bold">{sessionData.result.animationCalls}</span> motion calls
           </span>
         </motion.div>
       </div>

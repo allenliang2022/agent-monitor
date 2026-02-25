@@ -81,7 +81,7 @@ export default function ArchitectureOverview() {
           className="mb-10"
         >
           <h2 className="text-2xl sm:text-3xl font-bold">
-            <span className="bg-gradient-to-r from-amber to-green bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-amber-400 to-emerald-400 bg-clip-text text-transparent">
               Architecture Overview
             </span>
           </h2>
@@ -277,10 +277,10 @@ export default function ArchitectureOverview() {
         {/* Summary cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6">
           {[
-            { label: "Task", value: sessionData.task.name, color: "text-cyan" },
-            { label: "Branch", value: sessionData.task.branch, color: "text-green" },
-            { label: "Commit", value: sessionData.result.commitHash, color: "text-amber" },
-            { label: "Build", value: sessionData.result.buildStatus, color: "text-green" },
+            { label: "Task", value: sessionData.task.name, color: "text-cyan-400" },
+            { label: "Branch", value: sessionData.task.branch, color: "text-emerald-400" },
+            { label: "Commit", value: sessionData.result.commitHash, color: "text-amber-400" },
+            { label: "Build", value: sessionData.result.buildStatus, color: "text-emerald-400" },
           ].map((item, i) => (
             <motion.div
               key={item.label}
@@ -308,9 +308,9 @@ export default function ArchitectureOverview() {
           transition={{ delay: 1.2 }}
           className="mt-16 text-center"
         >
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-green/20 bg-green/5">
-            <span className="w-2 h-2 rounded-full bg-green" />
-            <span className="text-sm font-mono text-green">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-emerald-400/20 bg-emerald-400/5">
+            <span className="w-2 h-2 rounded-full bg-emerald-400" />
+            <span className="text-sm font-mono text-emerald-400">
               Session Complete - All systems nominal
             </span>
           </div>

@@ -91,7 +91,7 @@ export default function PromptDisplay() {
           className="mb-10"
         >
           <h2 className="text-2xl sm:text-3xl font-bold">
-            <span className="bg-gradient-to-r from-purple to-amber bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-purple-500 to-amber-400 bg-clip-text text-transparent">
               Prompt Architecture
             </span>
           </h2>
@@ -117,13 +117,13 @@ export default function PromptDisplay() {
                     onClick={() => setExpandedSection(isExpanded ? null : i)}
                     className={`w-full text-left rounded-xl border p-4 transition-all ${
                       isExpanded
-                        ? "border-purple/30 bg-purple/5"
+                        ? "border-purple-500/30 bg-purple-500/5"
                         : "border-slate-700/50 bg-slate-900/30 hover:border-slate-600"
                     }`}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <span className="text-xs font-mono text-purple bg-purple/10 px-2 py-0.5 rounded">
+                        <span className="text-xs font-mono text-purple-500 bg-purple-500/10 px-2 py-0.5 rounded">
                           {i + 1}/{promptSections.length}
                         </span>
                         <span className="font-semibold text-white text-sm">{section.title}</span>
@@ -156,8 +156,8 @@ export default function PromptDisplay() {
                                 const isDash = line.startsWith("- ");
                                 return (
                                   <div key={li} className={`${
-                                    isComponent ? "text-cyan" :
-                                    isDash ? "text-amber" :
+                                    isComponent ? "text-cyan-400" :
+                                    isDash ? "text-amber-400" :
                                     "text-slate-300"
                                   }`}>
                                     {line}
@@ -182,23 +182,23 @@ export default function PromptDisplay() {
               transition={{ delay: 0.4 }}
               className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6"
             >
-              <div className="rounded-xl border border-amber/20 bg-amber/5 p-4">
-                <h3 className="text-sm font-bold text-amber font-mono mb-3">Performance Rules</h3>
+              <div className="rounded-xl border border-amber-400/20 bg-amber-400/5 p-4">
+                <h3 className="text-sm font-bold text-amber-400 font-mono mb-3">Performance Rules</h3>
                 <ul className="space-y-2">
                   {performanceRules.map((rule, i) => (
                     <li key={i} className="flex items-start gap-2 text-xs text-slate-400">
-                      <span className="text-amber mt-0.5">*</span>
+                      <span className="text-amber-400 mt-0.5">*</span>
                       {rule}
                     </li>
                   ))}
                 </ul>
               </div>
-              <div className="rounded-xl border border-red/20 bg-red/5 p-4">
-                <h3 className="text-sm font-bold text-red font-mono mb-3">Constraints</h3>
+              <div className="rounded-xl border border-red-400/20 bg-red-400/5 p-4">
+                <h3 className="text-sm font-bold text-red-400 font-mono mb-3">Constraints</h3>
                 <ul className="space-y-2">
                   {constraints.map((rule, i) => (
                     <li key={i} className="flex items-start gap-2 text-xs text-slate-400">
-                      <span className="text-red mt-0.5">!</span>
+                      <span className="text-red-400 mt-0.5">!</span>
                       {rule}
                     </li>
                   ))}
@@ -220,9 +220,9 @@ export default function PromptDisplay() {
                 viewport={{ once: true }}
                 transition={{ delay: 0.2 + i * 0.08, duration: 0.4 }}
                 whileHover={{ x: -4 }}
-                className="rounded-xl border border-slate-700/50 bg-slate-900/30 p-4 hover:border-purple/30 transition-colors"
+                className="rounded-xl border border-slate-700/50 bg-slate-900/30 p-4 hover:border-purple-500/30 transition-colors"
               >
-                <h4 className="text-sm font-bold text-purple mb-1">{insight.title}</h4>
+                <h4 className="text-sm font-bold text-purple-500 mb-1">{insight.title}</h4>
                 <p className="text-xs text-slate-400 leading-relaxed">{insight.description}</p>
               </motion.div>
             ))}

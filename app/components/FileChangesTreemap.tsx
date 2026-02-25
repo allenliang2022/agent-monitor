@@ -5,11 +5,11 @@ import { useState } from "react";
 import sessionData from "@/data/swarm-session.json";
 
 const categoryColors: Record<string, { bg: string; border: string; text: string; fill: string }> = {
-  component: { bg: "bg-cyan/20", border: "border-cyan/30", text: "text-cyan", fill: "#00d4ff" },
-  page: { bg: "bg-purple/20", border: "border-purple/30", text: "text-purple", fill: "#9333ea" },
-  lib: { bg: "bg-green/20", border: "border-green/30", text: "text-green", fill: "#22c55e" },
-  style: { bg: "bg-amber/20", border: "border-amber/30", text: "text-amber", fill: "#f59e0b" },
-  data: { bg: "bg-green/20", border: "border-green/30", text: "text-green", fill: "#22c55e" },
+  component: { bg: "bg-cyan-400/20", border: "border-cyan-400/30", text: "text-cyan-400", fill: "#00d4ff" },
+  page: { bg: "bg-purple-500/20", border: "border-purple-500/30", text: "text-purple-500", fill: "#9333ea" },
+  lib: { bg: "bg-emerald-400/20", border: "border-emerald-400/30", text: "text-emerald-400", fill: "#22c55e" },
+  style: { bg: "bg-amber-400/20", border: "border-amber-400/30", text: "text-amber-400", fill: "#f59e0b" },
+  data: { bg: "bg-emerald-400/20", border: "border-emerald-400/30", text: "text-emerald-400", fill: "#22c55e" },
   deps: { bg: "bg-slate-600/20", border: "border-slate-500/30", text: "text-slate-400", fill: "#64748b" },
 };
 
@@ -143,7 +143,7 @@ export default function FileChangesTreemap() {
           className="mb-10"
         >
           <h2 className="text-2xl sm:text-3xl font-bold">
-            <span className="bg-gradient-to-r from-cyan to-amber bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-cyan-400 to-amber-400 bg-clip-text text-transparent">
               File Changes Heatmap
             </span>
           </h2>

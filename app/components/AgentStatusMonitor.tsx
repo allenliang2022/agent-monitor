@@ -51,7 +51,7 @@ export default function AgentStatusMonitor() {
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-2xl sm:text-3xl font-bold">
-                <span className="bg-gradient-to-r from-cyan to-green bg-clip-text text-transparent">
+                <span className="bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">
                   Agent Status Monitor
                 </span>
               </h2>
@@ -63,11 +63,11 @@ export default function AgentStatusMonitor() {
               onClick={() => setIsAnimating(!isAnimating)}
               className={`flex items-center gap-2 px-3 py-1.5 rounded-lg font-mono text-xs border transition-colors ${
                 isAnimating
-                  ? "border-green/30 bg-green/10 text-green"
+                  ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-400"
                   : "border-slate-600 bg-slate-800 text-slate-400"
               }`}
             >
-              <span className={`w-2 h-2 rounded-full ${isAnimating ? "bg-green animate-pulse-dot" : "bg-slate-500"}`} />
+              <span className={`w-2 h-2 rounded-full ${isAnimating ? "bg-emerald-400 animate-pulse-dot" : "bg-slate-500"}`} />
               {isAnimating ? "LIVE" : "PAUSED"}
             </button>
           </div>
@@ -84,11 +84,11 @@ export default function AgentStatusMonitor() {
               }}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg font-mono text-xs whitespace-nowrap border transition-all ${
                 activeCheck === i
-                  ? "border-cyan/40 bg-cyan/10 text-cyan"
+                  ? "border-cyan-400/40 bg-cyan-400/10 text-cyan-400"
                   : "border-slate-700 bg-slate-800/50 text-slate-400 hover:border-slate-600"
               }`}
             >
-              <span className={`w-2 h-2 rounded-full ${activeCheck === i ? "bg-cyan" : "bg-slate-600"}`} />
+              <span className={`w-2 h-2 rounded-full ${activeCheck === i ? "bg-cyan-400" : "bg-slate-600"}`} />
               {check.title}
             </button>
           ))}
@@ -138,11 +138,11 @@ function CheckDisplay({
         transition={{ delay: 0.1 }}
         className={`rounded-xl border p-5 ${
           isAlive
-            ? "border-green/20 bg-green/5 glow-green"
+            ? "border-emerald-400/20 bg-emerald-400/5 glow-green"
             : isDead
-            ? "border-red/20 bg-red/5"
+            ? "border-red-400/20 bg-red-400/5"
             : isBuild
-            ? "border-green/20 bg-green/5 glow-green"
+            ? "border-emerald-400/20 bg-emerald-400/5 glow-green"
             : "border-slate-700 bg-slate-800/50"
         }`}
       >
@@ -159,11 +159,11 @@ function CheckDisplay({
             transition={{ duration: 1.5, repeat: isAlive ? Infinity : 0 }}
             className={`px-3 py-1 rounded-full font-mono text-sm font-bold ${
               isAlive
-                ? "bg-green/20 text-green"
+                ? "bg-emerald-400/20 text-emerald-400"
                 : isDead
-                ? "bg-red/20 text-red"
+                ? "bg-red-400/20 text-red-400"
                 : isBuild
-                ? "bg-green/20 text-green"
+                ? "bg-emerald-400/20 text-emerald-400"
                 : "bg-slate-700 text-slate-400"
             }`}
           >
@@ -182,13 +182,13 @@ function CheckDisplay({
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ delay: 0.2 }}
-        className="rounded-xl border border-cyan/20 bg-cyan/5 p-5"
+        className="rounded-xl border border-cyan-400/20 bg-cyan-400/5 p-5"
       >
         <div className="flex items-center justify-between mb-4">
           <span className="text-xs font-mono text-slate-500 uppercase tracking-wider">
             Components Progress
           </span>
-          <span className="text-cyan font-mono text-sm font-bold">
+          <span className="text-cyan-400 font-mono text-sm font-bold">
             {components.length}/{totalComponents}
           </span>
         </div>
@@ -199,7 +199,7 @@ function CheckDisplay({
             initial={{ width: 0 }}
             animate={{ width: `${progress}%` }}
             transition={{ duration: 1, ease: "easeOut" }}
-            className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-cyan to-purple"
+            className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-cyan-400 to-purple-500"
           />
         </div>
 
@@ -211,7 +211,7 @@ function CheckDisplay({
                 initial={{ opacity: 0, scale: 0 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: 0.3 + i * 0.05 }}
-                className="text-xs font-mono px-2 py-0.5 rounded bg-cyan/10 text-cyan border border-cyan/20"
+                className="text-xs font-mono px-2 py-0.5 rounded bg-cyan-400/10 text-cyan-400 border border-cyan-400/20"
               >
                 {comp}
               </motion.span>
@@ -225,7 +225,7 @@ function CheckDisplay({
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ delay: 0.3 }}
-        className="rounded-xl border border-purple/20 bg-purple/5 p-5"
+        className="rounded-xl border border-purple-500/20 bg-purple-500/5 p-5"
       >
         <span className="text-xs font-mono text-slate-500 uppercase tracking-wider">
           Files Detected
@@ -235,33 +235,33 @@ function CheckDisplay({
             <div className="space-y-1">
               {results.changedFiles.map((file) => (
                 <div key={file} className="flex items-center gap-2 text-sm font-mono">
-                  <span className="text-purple">+</span>
+                  <span className="text-purple-500">+</span>
                   <span className="text-slate-300">{file}</span>
                 </div>
               ))}
             </div>
           ) : results.totalChanged ? (
-            <div className="text-2xl font-bold font-mono text-purple">
+            <div className="text-2xl font-bold font-mono text-purple-500">
               {results.totalChanged} files
             </div>
           ) : results.dirtyFiles !== undefined ? (
             <div className="flex items-center gap-2">
-              <span className="text-2xl font-bold font-mono text-green">{results.dirtyFiles}</span>
+              <span className="text-2xl font-bold font-mono text-emerald-400">{results.dirtyFiles}</span>
               <span className="text-sm text-slate-400">dirty files (clean worktree)</span>
             </div>
           ) : results.staticPages ? (
             <div className="space-y-2">
               <div className="flex justify-between">
                 <span className="text-sm text-slate-400">Static pages</span>
-                <span className="font-mono text-green">{results.staticPages}</span>
+                <span className="font-mono text-emerald-400">{results.staticPages}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-sm text-slate-400">Build time</span>
-                <span className="font-mono text-green">{results.buildTime}</span>
+                <span className="font-mono text-emerald-400">{results.buildTime}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-sm text-slate-400">TypeScript</span>
-                <span className="font-mono text-green">{results.typescript}</span>
+                <span className="font-mono text-emerald-400">{results.typescript}</span>
               </div>
             </div>
           ) : (
@@ -275,7 +275,7 @@ function CheckDisplay({
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ delay: 0.4 }}
-        className="rounded-xl border border-amber/20 bg-amber/5 p-5"
+        className="rounded-xl border border-amber-400/20 bg-amber-400/5 p-5"
       >
         <span className="text-xs font-mono text-slate-500 uppercase tracking-wider">
           Git Status
@@ -283,7 +283,7 @@ function CheckDisplay({
         <div className="mt-3 space-y-2">
           {results.commitExists !== undefined && (
             <div className="flex items-center gap-2">
-              <span className={`w-2 h-2 rounded-full ${results.commitExists ? "bg-green" : "bg-amber"}`} />
+              <span className={`w-2 h-2 rounded-full ${results.commitExists ? "bg-emerald-400" : "bg-amber-400"}`} />
               <span className="text-sm text-slate-300">
                 Commit: {results.commitExists ? "exists" : "pending"}
               </span>
@@ -291,7 +291,7 @@ function CheckDisplay({
           )}
           {results.commitHash && (
             <div className="flex items-center gap-2">
-              <span className="font-mono text-xs px-2 py-0.5 rounded bg-green/10 text-green border border-green/20">
+              <span className="font-mono text-xs px-2 py-0.5 rounded bg-emerald-400/10 text-emerald-400 border border-emerald-400/20">
                 {results.commitHash}
               </span>
               <span className="text-xs text-slate-400 truncate">{results.commitMessage}</span>
@@ -299,26 +299,26 @@ function CheckDisplay({
           )}
           {results.framerMotion && (
             <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-green" />
+              <span className="w-2 h-2 rounded-full bg-emerald-400" />
               <span className="text-sm text-slate-300">{results.framerMotion}</span>
             </div>
           )}
           {results.newDirs && (
             <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-cyan" />
+              <span className="w-2 h-2 rounded-full bg-cyan-400" />
               <span className="text-sm text-slate-300">New: {results.newDirs.join(", ")}</span>
             </div>
           )}
           {results.libFiles && (
             <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-purple" />
+              <span className="w-2 h-2 rounded-full bg-purple-500" />
               <span className="text-sm text-slate-300">Lib: {results.libFiles.join(", ")}</span>
             </div>
           )}
           {"assessment" in check && check.assessment && (
             <div className="mt-3 pt-3 border-t border-slate-700/30">
               <span className="text-xs font-mono text-slate-500 block mb-1">ASSESSMENT</span>
-              <span className="text-sm text-green">{check.assessment as string}</span>
+              <span className="text-sm text-emerald-400">{check.assessment as string}</span>
             </div>
           )}
         </div>

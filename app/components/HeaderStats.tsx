@@ -42,9 +42,9 @@ const stats = [
     value: sessionData.result.filesChanged,
     prefix: "",
     suffix: "",
-    color: "text-cyan",
-    bg: "bg-cyan/10",
-    border: "border-cyan/20",
+    color: "text-cyan-400",
+    bg: "bg-cyan-400/10",
+    border: "border-cyan-400/20",
     glow: "glow-cyan",
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -57,9 +57,9 @@ const stats = [
     value: sessionData.result.linesAdded,
     prefix: "+",
     suffix: "",
-    color: "text-green",
-    bg: "bg-green/10",
-    border: "border-green/20",
+    color: "text-emerald-400",
+    bg: "bg-emerald-400/10",
+    border: "border-emerald-400/20",
     glow: "glow-green",
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -72,9 +72,9 @@ const stats = [
     value: Math.round(sessionData.session.durationMs / 60000),
     prefix: "~",
     suffix: "min",
-    color: "text-purple",
-    bg: "bg-purple/10",
-    border: "border-purple/20",
+    color: "text-purple-500",
+    bg: "bg-purple-500/10",
+    border: "border-purple-500/20",
     glow: "glow-purple",
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -87,9 +87,9 @@ const stats = [
     value: sessionData.result.animationCalls,
     prefix: "",
     suffix: "",
-    color: "text-amber",
-    bg: "bg-amber/10",
-    border: "border-amber/20",
+    color: "text-amber-400",
+    bg: "bg-amber-400/10",
+    border: "border-amber-400/20",
     glow: "glow-amber",
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -103,7 +103,7 @@ export default function HeaderStats() {
   return (
     <section className="relative px-4 sm:px-6 lg:px-8 pt-12 pb-8">
       {/* Background gradient orb */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-purple/5 rounded-full blur-[100px] pointer-events-none" />
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-purple-500/5 rounded-full blur-[100px] pointer-events-none" />
 
       <div className="max-w-7xl mx-auto relative">
         {/* Header */}
@@ -117,9 +117,9 @@ export default function HeaderStats() {
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.2, duration: 0.5 }}
-            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-cyan/20 bg-cyan/5 text-cyan text-sm font-mono mb-6"
+            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-cyan-400/20 bg-cyan-400/5 text-cyan-400 text-sm font-mono mb-6"
           >
-            <span className="w-2 h-2 rounded-full bg-cyan animate-pulse-dot" />
+            <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse-dot" />
             MISSION CONTROL
           </motion.div>
 
@@ -132,7 +132,7 @@ export default function HeaderStats() {
             <span className="bg-gradient-to-r from-white via-white to-white/60 bg-clip-text text-transparent">
               Agent Swarm
             </span>{" "}
-            <span className="bg-gradient-to-r from-cyan via-purple to-cyan bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-cyan-400 via-purple-500 to-cyan-400 bg-clip-text text-transparent">
               Monitor
             </span>
           </motion.h1>
@@ -145,12 +145,12 @@ export default function HeaderStats() {
           >
             <span>
               Orchestrator:{" "}
-              <span className="text-purple font-semibold">{sessionData.session.orchestrator}</span>
+              <span className="text-purple-500 font-semibold">{sessionData.session.orchestrator}</span>
             </span>
             <span className="hidden sm:inline text-slate-600">|</span>
             <span>
               Agent:{" "}
-              <span className="text-cyan">{sessionData.task.agent}</span>
+              <span className="text-cyan-400">{sessionData.task.agent}</span>
             </span>
             <span className="hidden sm:inline text-slate-600">|</span>
             <span>
@@ -159,7 +159,7 @@ export default function HeaderStats() {
             <span className="hidden sm:inline text-slate-600">|</span>
             <span>
               Project:{" "}
-              <span className="text-amber">{sessionData.task.project}</span>
+              <span className="text-amber-400">{sessionData.task.project}</span>
             </span>
           </motion.div>
         </motion.div>
