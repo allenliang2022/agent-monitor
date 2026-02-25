@@ -24,7 +24,10 @@ export async function GET(request: NextRequest) {
   try {
     const branch = execGit("git rev-parse --abbrev-ref HEAD", dir);
     const status = execGit("git status --short", dir);
-    const log = execGit("git log --oneline -5", dir);
+    const log = execGit(
+      'git log --format="%H|%s|%an|%ar" -10',
+      dir
+    );
     const diffStat = execGit("git diff --stat", dir);
 
     const changedFiles = status
@@ -41,10 +44,12 @@ export async function GET(request: NextRequest) {
         .split("\n")
         .filter((l) => l.trim())
         .map((line) => {
-          const spaceIdx = line.indexOf(" ");
+          const parts = line.split("|");
           return {
-            hash: line.substring(0, spaceIdx),
-            message: line.substring(spaceIdx + 1),
+            hash: parts[0] || "",
+            message: parts[1] || "",
+            author: parts[2] || "",
+            time: parts[3] || "",
           };
         }),
       diffStat: diffStat || "(no changes)",
