@@ -7,10 +7,9 @@ import { LiveProvider } from "./LiveContext";
 
 const subNavItems = [
   { href: "/live", label: "Overview", icon: "+" },
-  { href: "/live/sessions", label: "Sessions", icon: ">" },
-  { href: "/live/agents", label: "Agents", icon: "#" },
+  { href: "/live/tasks", label: "Tasks", icon: ">" },
+  { href: "/live/agent", label: "Agent", icon: "#" },
   { href: "/live/git", label: "Git", icon: "~" },
-  { href: "/live/config", label: "Config", icon: "@" },
   { href: "/live/prompt", label: "Prompt", icon: "$" },
 ];
 

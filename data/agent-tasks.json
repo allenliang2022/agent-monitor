@@ -1,0 +1,30 @@
+{
+  "tasks": [
+    {
+      "id": "tidal-basil",
+      "name": "Live Dashboard Enhancement",
+      "agent": "opencode",
+      "model": "claude-opus-4.6",
+      "promptFile": "LIVE_TASK.md",
+      "startedAt": "2026-02-25T19:47:00+08:00",
+      "completedAt": "2026-02-25T19:55:00+08:00",
+      "status": "completed",
+      "commit": "4a30047",
+      "filesChanged": 4,
+      "summary": "Added 4 live sections (overview, timeline, agent status, config) + /api/config endpoint"
+    },
+    {
+      "id": "good-river",
+      "name": "Live Multi-Page Split",
+      "agent": "opencode",
+      "model": "claude-opus-4.6",
+      "promptFile": "LIVE_SPLIT_TASK.md",
+      "startedAt": "2026-02-25T20:02:00+08:00",
+      "completedAt": "2026-02-25T20:08:00+08:00",
+      "status": "completed",
+      "commit": "9b9b80a",
+      "filesChanged": 9,
+      "summary": "Split LiveDashboard into 6 sub-pages with shared SSE context (LiveContext.tsx)"
+    }
+  ]
+}

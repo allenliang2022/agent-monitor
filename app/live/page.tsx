@@ -3,6 +3,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useLive } from "./LiveContext";
+import type { AgentTask } from "./LiveContext";
 
 function StatusPill({
   label,
@@ -21,20 +22,41 @@ function StatusPill({
   );
 }
 
+function statusColor(status: string) {
+  switch (status) {
+    case "running":
+      return "bg-cyan-500/10 text-cyan-400 border-cyan-500/20";
+    case "completed":
+      return "bg-green-500/10 text-green-400 border-green-500/20";
+    case "failed":
+      return "bg-red-500/10 text-red-400 border-red-500/20";
+    default:
+      return "bg-slate-500/10 text-slate-400 border-slate-500/20";
+  }
+}
+
+function formatDuration(task: AgentTask): string {
+  const start = new Date(task.startedAt).getTime();
+  const end = task.completedAt
+    ? new Date(task.completedAt).getTime()
+    : Date.now();
+  const mins = Math.floor((end - start) / 60000);
+  if (mins < 1) return "<1m";
+  return `${mins}m`;
+}
+
 const navCards = [
   {
-    href: "/live/sessions",
-    title: "Sessions & Timeline",
-    desc: "Active sessions table and live timeline",
-    color: "cyan",
+    href: "/live/tasks",
+    title: "Task Queue",
+    desc: "Active and completed agent tasks",
     borderClass: "border-cyan-500/20 hover:border-cyan-500/40",
     textClass: "text-cyan-400",
   },
   {
-    href: "/live/agents",
-    title: "Agent Status",
-    desc: "Real-time status of all 3 agents",
-    color: "purple",
+    href: "/live/agent",
+    title: "Agent Process",
+    desc: "Live coding agent output and todos",
     borderClass: "border-purple-500/20 hover:border-purple-500/40",
     textClass: "text-purple-400",
   },
@@ -42,37 +64,28 @@ const navCards = [
     href: "/live/git",
     title: "Git Activity",
     desc: "Watch directories and track commits",
-    color: "pink",
     borderClass: "border-pink-500/20 hover:border-pink-500/40",
     textClass: "text-pink-400",
   },
   {
-    href: "/live/config",
-    title: "System Config",
-    desc: "Agents, cron, skills, and channels",
-    color: "amber",
-    borderClass: "border-amber-500/20 hover:border-amber-500/40",
-    textClass: "text-amber-400",
-  },
-  {
     href: "/live/prompt",
     title: "Prompt Architecture",
-    desc: "Prompt design, rules, and constraints",
-    color: "green",
+    desc: "Prompts sent to coding agents",
     borderClass: "border-green-500/20 hover:border-green-500/40",
     textClass: "text-green-400",
   },
 ];
 
 export default function LiveOverviewPage() {
-  const {
-    connected,
-    sessions,
-    sseEventsCount,
-    uptime,
-    eventLog,
-    logEndRef,
-  } = useLive();
+  const { connected, tasks, sseEventsCount, uptime, eventLog, logEndRef } =
+    useLive();
+
+  const running = tasks.filter((t) => t.status === "running");
+  const completed = tasks.filter((t) => t.status === "completed");
+  const failed = tasks.filter((t) => t.status === "failed");
+  const totalFiles = tasks.reduce((sum, t) => sum + (t.filesChanged ?? 0), 0);
+  const totalCommits = tasks.filter((t) => t.commit).length;
+  const currentTask = running[0] ?? null;
 
   return (
     <div className="p-4 md:p-8 space-y-6">
@@ -96,32 +109,28 @@ export default function LiveOverviewPage() {
         </div>
         <div className="h-4 w-px bg-slate-700" />
         <StatusPill
-          label="Gateway"
-          value={connected ? "connected" : "disconnected"}
-          ok={connected}
+          label="Running"
+          value={String(running.length)}
+          ok={running.length > 0}
         />
         <StatusPill
-          label="Sessions"
-          value={String(sessions.length)}
-          ok={sessions.length > 0}
+          label="Completed"
+          value={String(completed.length)}
+          ok={completed.length > 0}
         />
         <StatusPill
-          label="Agents"
-          value={String(
-            new Set(sessions.map((s) => s.agentId).filter(Boolean)).size
-          )}
+          label="Failed"
+          value={String(failed.length)}
+          ok={failed.length === 0}
+        />
+        <StatusPill
+          label="Uptime"
+          value={uptime}
           ok={true}
-        />
-        <StatusPill
-          label="Active"
-          value={String(
-            sessions.filter((s) => (s.ageMs ?? 999999) < 300000).length
-          )}
-          ok={sessions.filter((s) => (s.ageMs ?? 999999) < 300000).length > 0}
         />
       </motion.div>
 
-      {/* ── Live Overview (Mission Control) ─────────────────────────────── */}
+      {/* ── Task Stats ──────────────────────────────────────────────────── */}
       <motion.section
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -129,14 +138,14 @@ export default function LiveOverviewPage() {
       >
         <div className="flex items-center gap-3 mb-3">
           <h2 className="text-sm font-mono text-cyan-400 flex items-center gap-2">
-            <span className="text-cyan-400/50">&gt;</span> Live Overview
+            <span className="text-cyan-400/50">&gt;</span> Agent Monitor
           </h2>
           <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-[10px] font-mono text-cyan-400">
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75" />
               <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-400" />
             </span>
-            MISSION CONTROL
+            TASK CONTROL
           </span>
         </div>
 
@@ -146,34 +155,15 @@ export default function LiveOverviewPage() {
             whileHover={{ scale: 1.02 }}
           >
             <div className="text-[10px] font-mono text-slate-500 mb-1">
-              ACTIVE SESSIONS
+              TOTAL TASKS
             </div>
             <motion.div
-              key={sessions.length}
+              key={tasks.length}
               initial={{ scale: 1.3, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               className="text-2xl font-mono font-bold text-cyan-400"
             >
-              {sessions.length}
-            </motion.div>
-          </motion.div>
-
-          <motion.div
-            className="bg-slate-900/40 border border-purple-500/20 rounded-lg p-4 text-center"
-            whileHover={{ scale: 1.02 }}
-          >
-            <div className="text-[10px] font-mono text-slate-500 mb-1">
-              ACTIVE AGENTS
-            </div>
-            <motion.div
-              key={
-                new Set(sessions.map((s) => s.agentId).filter(Boolean)).size
-              }
-              initial={{ scale: 1.3, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              className="text-2xl font-mono font-bold text-purple-400"
-            >
-              {new Set(sessions.map((s) => s.agentId).filter(Boolean)).size}
+              {tasks.length}
             </motion.div>
           </motion.div>
 
@@ -182,11 +172,33 @@ export default function LiveOverviewPage() {
             whileHover={{ scale: 1.02 }}
           >
             <div className="text-[10px] font-mono text-slate-500 mb-1">
-              UPTIME
+              COMMITS
             </div>
-            <div className="text-2xl font-mono font-bold text-green-400">
-              {uptime}
+            <motion.div
+              key={totalCommits}
+              initial={{ scale: 1.3, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="text-2xl font-mono font-bold text-green-400"
+            >
+              {totalCommits}
+            </motion.div>
+          </motion.div>
+
+          <motion.div
+            className="bg-slate-900/40 border border-purple-500/20 rounded-lg p-4 text-center"
+            whileHover={{ scale: 1.02 }}
+          >
+            <div className="text-[10px] font-mono text-slate-500 mb-1">
+              FILES CHANGED
             </div>
+            <motion.div
+              key={totalFiles}
+              initial={{ scale: 1.3, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="text-2xl font-mono font-bold text-purple-400"
+            >
+              {totalFiles}
+            </motion.div>
           </motion.div>
 
           <motion.div
@@ -194,7 +206,7 @@ export default function LiveOverviewPage() {
             whileHover={{ scale: 1.02 }}
           >
             <div className="text-[10px] font-mono text-slate-500 mb-1">
-              EVENTS RECEIVED
+              SSE EVENTS
             </div>
             <motion.div
               key={sseEventsCount}
@@ -206,6 +218,59 @@ export default function LiveOverviewPage() {
             </motion.div>
           </motion.div>
         </div>
+      </motion.section>
+
+      {/* ── Current Task ────────────────────────────────────────────────── */}
+      <motion.section
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.15 }}
+      >
+        <h2 className="text-sm font-mono text-purple-400 mb-3 flex items-center gap-2">
+          <span className="text-purple-400/50">&gt;</span> Current Task
+        </h2>
+        {currentTask ? (
+          <motion.div
+            className="bg-slate-900/40 border border-purple-500/20 rounded-lg p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className="font-mono font-semibold text-sm text-purple-400">
+                {currentTask.name}
+              </span>
+              <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-[10px] font-mono text-cyan-400">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-400" />
+                </span>
+                RUNNING
+              </span>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs font-mono">
+              <div>
+                <span className="text-slate-500">Agent: </span>
+                <span className="text-slate-300">{currentTask.agent}</span>
+              </div>
+              <div>
+                <span className="text-slate-500">Duration: </span>
+                <span className="text-slate-300">{formatDuration(currentTask)}</span>
+              </div>
+              <div>
+                <span className="text-slate-500">Prompt: </span>
+                <span className="text-slate-300">{currentTask.promptFile ?? "\u2014"}</span>
+              </div>
+              <div>
+                <span className="text-slate-500">ID: </span>
+                <span className="text-slate-300">{currentTask.id}</span>
+              </div>
+            </div>
+          </motion.div>
+        ) : (
+          <div className="bg-slate-900/40 border border-slate-800/50 rounded-lg p-4 text-center text-slate-500 text-xs font-mono">
+            No active task. Agent idle.
+          </div>
+        )}
       </motion.section>
 
       {/* ── Event Log ───────────────────────────────────────────────────── */}
@@ -238,7 +303,7 @@ export default function LiveOverviewPage() {
                       ? "text-red-400"
                       : entry.type === "system"
                       ? "text-amber-400"
-                      : entry.type === "sessions"
+                      : entry.type === "agent"
                       ? "text-cyan-400"
                       : entry.type === "git"
                       ? "text-purple-400"
@@ -264,14 +329,16 @@ export default function LiveOverviewPage() {
         <h2 className="text-sm font-mono text-slate-400 mb-3 flex items-center gap-2">
           <span className="text-slate-500">&gt;</span> Explore
         </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {navCards.map((card) => (
             <Link key={card.href} href={card.href}>
               <motion.div
                 className={`bg-slate-900/40 border ${card.borderClass} rounded-lg p-4 transition-all cursor-pointer`}
                 whileHover={{ scale: 1.02, y: -2 }}
               >
-                <h3 className={`text-sm font-mono font-semibold ${card.textClass} mb-1`}>
+                <h3
+                  className={`text-sm font-mono font-semibold ${card.textClass} mb-1`}
+                >
                   {card.title}
                 </h3>
                 <p className="text-xs font-mono text-slate-500">{card.desc}</p>
