@@ -12,6 +12,9 @@ const subNavItems = [
   { href: "/live/tasks", label: "Tasks", icon: ">" },
   { href: "/live/agent", label: "Agent", icon: "_" },
   { href: "/live/git", label: "Git", icon: "~" },
+  { href: "/live/files", label: "Files", icon: "%" },
+  { href: "/live/monitoring", label: "Monitor", icon: "@" },
+  { href: "/live/architecture", label: "Arch", icon: "&" },
   { href: "/live/prompt", label: "Prompt", icon: "$" },
 ];
 
