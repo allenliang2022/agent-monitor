@@ -18,12 +18,21 @@ export interface AgentTask {
   agent: string;
   model?: string;
   promptFile?: string;
+  branch?: string;
+  description?: string;
   startedAt: string;
   completedAt?: string;
-  status: "running" | "completed" | "failed";
+  status: "running" | "completed" | "failed" | "pending";
   commit?: string;
   filesChanged?: number;
   summary?: string;
+}
+
+export interface GitCommit {
+  hash: string;
+  message: string;
+  author?: string;
+  time?: string;
 }
 
 export interface GitInfo {
@@ -32,7 +41,7 @@ export interface GitInfo {
   clean: boolean;
   changedFiles: number;
   status: string;
-  recentCommits: { hash: string; message: string }[];
+  recentCommits: GitCommit[];
   diffStat: string;
   error?: string;
 }
@@ -144,7 +153,7 @@ export function LiveProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     fetchTasks();
-    const interval = setInterval(fetchTasks, 10000);
+    const interval = setInterval(fetchTasks, 5000);
     return () => clearInterval(interval);
   }, [fetchTasks]);
 
