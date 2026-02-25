@@ -64,6 +64,67 @@ function getStage(id: string): FlowStage {
   return STAGES.find((s) => s.id === id)!;
 }
 
+// Format duration from milliseconds
+function formatDuration(ms: number): string {
+  if (ms < 0) return "0s";
+  const totalSec = Math.floor(ms / 1000);
+  const hours = Math.floor(totalSec / 3600);
+  const minutes = Math.floor((totalSec % 3600) / 60);
+  const seconds = totalSec % 60;
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  if (minutes > 0) return `${minutes}m ${seconds}s`;
+  return `${seconds}s`;
+}
+
+// Format a timestamp to a short time string
+function formatTime(dateStr: string): string {
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return "";
+    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  } catch {
+    return "";
+  }
+}
+
+// Compute timing info for tasks at a stage
+interface StageTiming {
+  duration: string;        // how long the longest task has been in this stage
+  lastEntered: string;     // when the most recent task entered this stage
+  lastEnteredTime: string; // formatted time
+}
+
+function computeStageTiming(tasks: AgentTask[], now: number): StageTiming {
+  if (tasks.length === 0) {
+    return { duration: "", lastEntered: "", lastEnteredTime: "" };
+  }
+
+  let longestDuration = 0;
+  let latestEntry = "";
+
+  for (const task of tasks) {
+    const startTime = task.startedAt ? new Date(task.startedAt).getTime() : 0;
+    const endTime = task.completedAt ? new Date(task.completedAt).getTime() : now;
+
+    if (startTime > 0) {
+      const dur = endTime - startTime;
+      if (dur > longestDuration) longestDuration = dur;
+    }
+
+    // Track the most recent task to enter this stage
+    const entryTime = task.startedAt || "";
+    if (!latestEntry || (entryTime && entryTime > latestEntry)) {
+      latestEntry = entryTime;
+    }
+  }
+
+  return {
+    duration: longestDuration > 0 ? formatDuration(longestDuration) : "",
+    lastEntered: latestEntry,
+    lastEnteredTime: latestEntry ? formatTime(latestEntry) : "",
+  };
+}
+
 export default function LiveMonitoringPage() {
   const { tasks } = useLive();
   const [hoveredStage, setHoveredStage] = useState<string | null>(null);
@@ -78,6 +139,16 @@ export default function LiveMonitoringPage() {
     }
     return map;
   }, [tasks]);
+
+  // Timing info per stage
+  const timingByStage = useMemo(() => {
+    const now = Date.now();
+    const map: Record<string, StageTiming> = {};
+    for (const stage of STAGES) {
+      map[stage.id] = computeStageTiming(tasksByStage[stage.id] || [], now);
+    }
+    return map;
+  }, [tasksByStage]);
 
   // Active stages (have at least 1 task)
   const activeStages = useMemo(() => {
@@ -101,6 +172,7 @@ export default function LiveMonitoringPage() {
 
   const hoveredStageData = hoveredStage ? getStage(hoveredStage) : null;
   const hoveredTasks = hoveredStage ? tasksByStage[hoveredStage] || [] : [];
+  const hoveredTiming = hoveredStage ? timingByStage[hoveredStage] : null;
 
   const nodeW = 140;
   const nodeH = 46;
@@ -147,6 +219,82 @@ export default function LiveMonitoringPage() {
     const tx = to.x;
     const ty = to.y;
     return `M ${fx} ${fy + 4} L ${tx} ${ty - 4}`;
+  }
+
+  // Render task name labels near a node
+  function renderTaskLabels(stage: FlowStage, stageTasks: AgentTask[], c: ReturnType<typeof stageColors>) {
+    if (stageTasks.length === 0) return null;
+    const timing = timingByStage[stage.id];
+
+    // Position labels to the right of the node (or left for right-side nodes)
+    const isRightSide = stage.x > 500;
+    const labelX = isRightSide ? stage.x - nodeW / 2 - 10 : stage.x + nodeW / 2 + 10;
+    const textAnchor = isRightSide ? "end" : "start";
+    const baseY = stage.type === "decision" ? stage.y + nodeH / 2 - 12 : stage.y + 4;
+
+    return (
+      <g>
+        {/* Duration label */}
+        {timing.duration && (
+          <text
+            x={labelX}
+            y={baseY}
+            textAnchor={textAnchor}
+            fill={c.text}
+            fontSize={10}
+            fontFamily="monospace"
+            fontWeight="700"
+            opacity={0.9}
+          >
+            {timing.duration}
+          </text>
+        )}
+
+        {/* Task names */}
+        {stageTasks.slice(0, 3).map((task, i) => (
+          <text
+            key={task.id}
+            x={labelX}
+            y={baseY + 14 + i * 13}
+            textAnchor={textAnchor}
+            fill={c.text}
+            fontSize={9}
+            fontFamily="monospace"
+            opacity={0.6}
+          >
+            {(task.name || task.id).slice(0, 18)}{(task.name || task.id).length > 18 ? "..." : ""}
+          </text>
+        ))}
+        {stageTasks.length > 3 && (
+          <text
+            x={labelX}
+            y={baseY + 14 + 3 * 13}
+            textAnchor={textAnchor}
+            fill={c.text}
+            fontSize={9}
+            fontFamily="monospace"
+            opacity={0.4}
+          >
+            +{stageTasks.length - 3} more
+          </text>
+        )}
+
+        {/* Timestamp */}
+        {timing.lastEnteredTime && (
+          <text
+            x={labelX}
+            y={baseY + 14 + Math.min(stageTasks.length, 3) * 13 + (stageTasks.length > 3 ? 13 : 0)}
+            textAnchor={textAnchor}
+            fill="#64748b"
+            fontSize={8}
+            fontFamily="monospace"
+            opacity={0.7}
+          >
+            @ {timing.lastEnteredTime}
+          </text>
+        )}
+      </g>
+    );
   }
 
   return (
@@ -295,6 +443,8 @@ export default function LiveMonitoringPage() {
                       </text>
                     </g>
                   )}
+                  {/* Task labels for decision nodes */}
+                  {renderTaskLabels(stage, tasksByStage[stage.id] || [], c)}
                 </g>
               );
             }
@@ -353,6 +503,8 @@ export default function LiveMonitoringPage() {
                     </text>
                   </g>
                 )}
+                {/* Task labels next to nodes */}
+                {renderTaskLabels(stage, tasksByStage[stage.id] || [], c)}
               </g>
             );
           })}
@@ -382,6 +534,11 @@ export default function LiveMonitoringPage() {
                   {hoveredTasks.length} task{hoveredTasks.length !== 1 ? "s" : ""}
                 </span>
               )}
+              {hoveredTiming?.duration && (
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-700/50 text-amber-400">
+                  {hoveredTiming.duration}
+                </span>
+              )}
             </div>
             <p className="text-xs text-slate-400 leading-relaxed">{hoveredStageData.description}</p>
             {hoveredTasks.length > 0 && (
@@ -391,6 +548,11 @@ export default function LiveMonitoringPage() {
                     <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
                     <span className="text-slate-300">{task.name || task.id}</span>
                     <span className="text-slate-500">({task.agent})</span>
+                    {task.startedAt && (
+                      <span className="text-slate-600 ml-auto">
+                        {formatDuration(Date.now() - new Date(task.startedAt).getTime())} ago
+                      </span>
+                    )}
                   </div>
                 ))}
               </div>
@@ -399,7 +561,7 @@ export default function LiveMonitoringPage() {
         )}
       </motion.div>
 
-      {/* Stage summary cards */}
+      {/* Stage summary cards — with timing info */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
           { label: "Running", stages: ["coding"], color: "text-purple-500", bgColor: "bg-purple-500/10", borderColor: "border-purple-500/20" },
@@ -407,18 +569,52 @@ export default function LiveMonitoringPage() {
           { label: "In Review", stages: ["review"], color: "text-cyan-400", bgColor: "bg-cyan-400/10", borderColor: "border-cyan-400/20" },
           { label: "Merged", stages: ["merge"], color: "text-emerald-400", bgColor: "bg-emerald-400/10", borderColor: "border-emerald-400/20" },
         ].map((card) => {
-          const count = card.stages.reduce((s, st) => s + (tasksByStage[st]?.length || 0), 0);
+          const stageTasks = card.stages.flatMap((st) => tasksByStage[st] || []);
+          const count = stageTasks.length;
+          const timing = card.stages.length > 0 ? timingByStage[card.stages[0]] : null;
+
           return (
             <div
               key={card.label}
-              className={`rounded-xl border ${card.borderColor} ${card.bgColor} p-4 text-center`}
+              className={`rounded-xl border ${card.borderColor} ${card.bgColor} p-4`}
             >
-              <div className="text-xs font-mono text-slate-500 uppercase tracking-wider mb-1">
-                {card.label}
+              <div className="flex items-center justify-between mb-1">
+                <div className="text-xs font-mono text-slate-500 uppercase tracking-wider">
+                  {card.label}
+                </div>
+                {timing?.duration && (
+                  <div className="text-[10px] font-mono text-slate-500">
+                    {timing.duration}
+                  </div>
+                )}
               </div>
               <div className={`text-2xl font-mono font-bold ${card.color}`}>
                 {count}
               </div>
+              {/* Show task names */}
+              {stageTasks.length > 0 && (
+                <div className="mt-2 pt-2 border-t border-slate-700/50 space-y-0.5">
+                  {stageTasks.slice(0, 3).map((task) => (
+                    <div key={task.id} className="flex items-center gap-1.5">
+                      <span className={`w-1 h-1 rounded-full ${card.bgColor}`} style={{ opacity: 0.8 }} />
+                      <span className="text-[10px] font-mono text-slate-400 truncate">
+                        {task.name || task.id}
+                      </span>
+                    </div>
+                  ))}
+                  {stageTasks.length > 3 && (
+                    <div className="text-[10px] font-mono text-slate-500 pl-2.5">
+                      +{stageTasks.length - 3} more
+                    </div>
+                  )}
+                </div>
+              )}
+              {/* Timestamp */}
+              {timing?.lastEnteredTime && (
+                <div className="text-[9px] font-mono text-slate-600 mt-1.5">
+                  last @ {timing.lastEnteredTime}
+                </div>
+              )}
             </div>
           );
         })}

@@ -7,11 +7,11 @@ import type { FileChange } from "../LiveContext";
 
 // Color palette per task index
 const TASK_COLORS = [
-  { bg: "bg-cyan-400/10", border: "border-cyan-400/20", text: "text-cyan-400", fill: "#22d3ee" },
-  { bg: "bg-purple-500/10", border: "border-purple-500/20", text: "text-purple-500", fill: "#a855f7" },
-  { bg: "bg-emerald-400/10", border: "border-emerald-400/20", text: "text-emerald-400", fill: "#34d399" },
-  { bg: "bg-amber-400/10", border: "border-amber-400/20", text: "text-amber-400", fill: "#fbbf24" },
-  { bg: "bg-red-400/10", border: "border-red-400/20", text: "text-red-400", fill: "#f87171" },
+  { bg: "bg-cyan-400/10", border: "border-cyan-400/20", text: "text-cyan-400", fill: "#22d3ee", hoverBg: "hover:bg-cyan-400/15" },
+  { bg: "bg-purple-500/10", border: "border-purple-500/20", text: "text-purple-500", fill: "#a855f7", hoverBg: "hover:bg-purple-500/15" },
+  { bg: "bg-emerald-400/10", border: "border-emerald-400/20", text: "text-emerald-400", fill: "#34d399", hoverBg: "hover:bg-emerald-400/15" },
+  { bg: "bg-amber-400/10", border: "border-amber-400/20", text: "text-amber-400", fill: "#fbbf24", hoverBg: "hover:bg-amber-400/15" },
+  { bg: "bg-red-400/10", border: "border-red-400/20", text: "text-red-400", fill: "#f87171", hoverBg: "hover:bg-red-400/15" },
 ];
 
 interface TreemapFile {
@@ -31,6 +31,7 @@ interface TreemapRect {
   file: TreemapFile;
 }
 
+// Squarified treemap algorithm for better proportional layout
 function calculateTreemap(files: TreemapFile[], width: number, height: number): TreemapRect[] {
   if (files.length === 0) return [];
 
@@ -38,60 +39,96 @@ function calculateTreemap(files: TreemapFile[], width: number, height: number): 
   if (totalSize === 0) return [];
 
   const sorted = [...files].sort((a, b) => b.total - a.total);
+
+  // Normalize values so they sum to total area
+  const area = width * height;
+  const normalized = sorted.map((f) => ({
+    ...f,
+    normalizedSize: (f.total / totalSize) * area,
+  }));
+
   const rects: TreemapRect[] = [];
 
-  let x = 0;
-  let y = 0;
-  let remainingWidth = width;
-  let remainingHeight = height;
-  let remainingTotal = totalSize;
-  let i = 0;
-  let horizontal = true;
-
-  while (i < sorted.length) {
-    const rowItems: TreemapFile[] = [];
-    let rowTotal = 0;
-    const maxRowItems = Math.min(
-      Math.ceil(Math.sqrt(sorted.length - i)),
-      sorted.length - i
-    );
-
-    for (let j = 0; j < maxRowItems && i + j < sorted.length; j++) {
-      rowItems.push(sorted[i + j]);
-      rowTotal += sorted[i + j].total;
+  function squarify(
+    items: (TreemapFile & { normalizedSize: number })[],
+    x: number,
+    y: number,
+    w: number,
+    h: number
+  ) {
+    if (items.length === 0) return;
+    if (items.length === 1) {
+      rects.push({ x, y, w, h, file: items[0] });
+      return;
     }
 
-    const rowFraction = remainingTotal > 0 ? rowTotal / remainingTotal : 0;
+    const totalArea = items.reduce((s, item) => s + item.normalizedSize, 0);
+    const horizontal = w >= h;
 
-    if (horizontal) {
-      const rowHeight = remainingHeight * rowFraction;
-      let rx = x;
-      for (const item of rowItems) {
-        const itemFraction = rowTotal > 0 ? item.total / rowTotal : 1 / rowItems.length;
-        const itemWidth = remainingWidth * itemFraction;
-        rects.push({ x: rx, y, w: itemWidth, h: rowHeight, file: item });
-        rx += itemWidth;
+    let rowItems: (TreemapFile & { normalizedSize: number })[] = [];
+    let rowArea = 0;
+    let bestAspect = Infinity;
+
+    for (let i = 0; i < items.length; i++) {
+      const testRow = [...rowItems, items[i]];
+      const testArea = rowArea + items[i].normalizedSize;
+
+      // Calculate worst aspect ratio for this row
+      const side = horizontal ? (testArea / h) : (testArea / w);
+      let worstAspect = 0;
+      for (const item of testRow) {
+        const other = horizontal ? (item.normalizedSize / side) : (item.normalizedSize / side);
+        const aspect = Math.max(side / other, other / side);
+        worstAspect = Math.max(worstAspect, aspect);
       }
-      y += rowHeight;
-      remainingHeight -= rowHeight;
-    } else {
-      const rowWidth = remainingWidth * rowFraction;
-      let ry = y;
-      for (const item of rowItems) {
-        const itemFraction = rowTotal > 0 ? item.total / rowTotal : 1 / rowItems.length;
-        const itemHeight = remainingHeight * itemFraction;
-        rects.push({ x, y: ry, w: rowWidth, h: itemHeight, file: item });
-        ry += itemHeight;
+
+      if (worstAspect <= bestAspect || rowItems.length === 0) {
+        rowItems = testRow;
+        rowArea = testArea;
+        bestAspect = worstAspect;
+      } else {
+        // Layout the row and recurse on remainder
+        layoutRow(rowItems, rowArea, x, y, w, h, horizontal);
+        const usedSize = horizontal ? (rowArea / h) : (rowArea / w);
+        const nx = horizontal ? x + usedSize : x;
+        const ny = horizontal ? y : y + usedSize;
+        const nw = horizontal ? w - usedSize : w;
+        const nh = horizontal ? h : h - usedSize;
+        squarify(items.slice(i), nx, ny, nw, nh);
+        return;
       }
-      x += rowWidth;
-      remainingWidth -= rowWidth;
     }
 
-    remainingTotal -= rowTotal;
-    i += rowItems.length;
-    horizontal = !horizontal;
+    // Layout remaining items
+    if (rowItems.length > 0) {
+      layoutRow(rowItems, rowArea, x, y, w, h, horizontal);
+    }
   }
 
+  function layoutRow(
+    items: (TreemapFile & { normalizedSize: number })[],
+    rowArea: number,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    horizontal: boolean
+  ) {
+    const side = horizontal ? rowArea / h : rowArea / w;
+    let offset = 0;
+
+    for (const item of items) {
+      const itemSize = item.normalizedSize / side;
+      if (horizontal) {
+        rects.push({ x, y: y + offset, w: side, h: itemSize, file: item });
+      } else {
+        rects.push({ x: x + offset, y, w: itemSize, h: side, file: item });
+      }
+      offset += itemSize;
+    }
+  }
+
+  squarify(normalized, 0, 0, width, height);
   return rects;
 }
 
@@ -104,6 +141,86 @@ function shortTaskKey(key: string): string {
   const parts = key.split("/");
   return parts[parts.length - 1] || key;
 }
+
+// ─── Card Grid for few files ────────────────────────────────────────────────
+
+function FileCard({
+  file,
+  maxTotal,
+  taskName,
+  delay,
+}: {
+  file: TreemapFile;
+  maxTotal: number;
+  taskName: string;
+  delay: number;
+}) {
+  const c = TASK_COLORS[file.colorIndex];
+  const barWidth = maxTotal > 0 ? (file.total / maxTotal) * 100 : 0;
+  const addPct = file.total > 0 ? (file.additions / file.total) * 100 : 0;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20, scale: 0.95 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ delay, duration: 0.4, ease: "easeOut" }}
+      whileHover={{ scale: 1.02, y: -2 }}
+      className={`rounded-xl border ${c.border} ${c.bg} p-5 overflow-hidden group cursor-default transition-colors ${c.hoverBg}`}
+    >
+      {/* Filename */}
+      <div className={`font-mono text-sm font-semibold ${c.text} mb-1 truncate`}>
+        {shortPath(file.path)}
+      </div>
+
+      {/* Full path */}
+      <div className="font-mono text-[10px] text-slate-500 truncate mb-3" title={file.path}>
+        {file.path}
+      </div>
+
+      {/* Task */}
+      <div className="flex items-center gap-1.5 mb-3">
+        <div className={`w-2 h-2 rounded-full ${c.bg} ${c.border} border`} style={{ backgroundColor: c.fill }} />
+        <span className="font-mono text-[10px] text-slate-400 truncate">
+          {taskName}
+        </span>
+      </div>
+
+      {/* Stats */}
+      <div className="flex items-center gap-3 mb-3">
+        <span className="font-mono text-sm text-emerald-400 font-semibold">+{file.additions}</span>
+        <span className="font-mono text-sm text-red-400 font-semibold">-{file.deletions}</span>
+        <span className="font-mono text-xs text-slate-500">({file.total} total)</span>
+      </div>
+
+      {/* Size bar */}
+      <div className="relative h-2 bg-slate-800 rounded-full overflow-hidden">
+        <motion.div
+          initial={{ width: 0 }}
+          animate={{ width: `${barWidth}%` }}
+          transition={{ delay: delay + 0.2, duration: 0.6, ease: "easeOut" }}
+          className="h-full rounded-full relative overflow-hidden"
+        >
+          {/* Additions portion */}
+          <div
+            className="absolute inset-y-0 left-0 bg-emerald-400/80"
+            style={{ width: `${addPct}%` }}
+          />
+          {/* Deletions portion */}
+          <div
+            className="absolute inset-y-0 right-0 bg-red-400/80"
+            style={{ width: `${100 - addPct}%` }}
+          />
+        </motion.div>
+      </div>
+      <div className="flex justify-between mt-1">
+        <span className="font-mono text-[9px] text-emerald-400/60">add</span>
+        <span className="font-mono text-[9px] text-red-400/60">del</span>
+      </div>
+    </motion.div>
+  );
+}
+
+// ─── Main Page ──────────────────────────────────────────────────────────────
 
 export default function LiveFilesPage() {
   const { fileChanges, tasks } = useLive();
@@ -151,6 +268,7 @@ export default function LiveFilesPage() {
 
   const totalAdditions = allFiles.reduce((s, f) => s + f.additions, 0);
   const totalDeletions = allFiles.reduce((s, f) => s + f.deletions, 0);
+  const maxFileTotal = allFiles.reduce((max, f) => Math.max(max, f.total), 0);
 
   const WIDTH = 900;
   const HEIGHT = 500;
@@ -175,6 +293,8 @@ export default function LiveFilesPage() {
 
   const sortIndicator = (field: string) =>
     sortField === field ? (sortAsc ? " ▲" : " ▼") : "";
+
+  const useFewFilesLayout = allFiles.length > 0 && allFiles.length <= 5;
 
   if (allFiles.length === 0) {
     return (
@@ -226,92 +346,115 @@ export default function LiveFilesPage() {
         })}
       </div>
 
-      {/* Treemap */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.98 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.5 }}
-        className="relative rounded-xl border border-slate-700 bg-slate-900/50 overflow-hidden"
-      >
-        <svg
-          viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
-          className="w-full h-auto"
-          preserveAspectRatio="xMidYMid meet"
-        >
-          {rects.map((rect, i) => {
-            const c = TASK_COLORS[rect.file.colorIndex];
-            const isHovered = hoveredFile?.path === rect.file.path && hoveredFile?.taskKey === rect.file.taskKey;
-            const filename = shortPath(rect.file.path);
-            const showLabel = rect.w > 60 && rect.h > 30;
+      {/* Few files: Card Grid layout */}
+      {useFewFilesLayout && (
+        <div className={`grid gap-4 ${
+          allFiles.length <= 2 ? "grid-cols-1 sm:grid-cols-2" :
+          allFiles.length <= 3 ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" :
+          "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4"
+        }`}>
+          {sortedFiles.map((file, i) => (
+            <FileCard
+              key={`${file.taskKey}-${file.path}-${i}`}
+              file={file}
+              maxTotal={maxFileTotal}
+              taskName={taskNameForKey(file.taskKey)}
+              delay={0.1 + i * 0.08}
+            />
+          ))}
+        </div>
+      )}
 
-            return (
-              <g
-                key={`${rect.file.taskKey}-${rect.file.path}-${i}`}
-                onMouseEnter={() => setHoveredFile(rect.file)}
-                onMouseLeave={() => setHoveredFile(null)}
-                className="cursor-pointer"
-              >
-                <rect
-                  x={rect.x + 1}
-                  y={rect.y + 1}
-                  width={Math.max(rect.w - 2, 0)}
-                  height={Math.max(rect.h - 2, 0)}
-                  rx={4}
-                  fill={c.fill}
-                  fillOpacity={isHovered ? 0.4 : 0.15}
-                  stroke={c.fill}
-                  strokeOpacity={isHovered ? 0.8 : 0.3}
-                  strokeWidth={isHovered ? 2 : 1}
-                />
-                {showLabel && (
-                  <>
+      {/* Many files: Proportional Treemap */}
+      {!useFewFilesLayout && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.98 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5 }}
+          className="relative rounded-xl border border-slate-700 bg-slate-900/50 overflow-hidden"
+        >
+          <svg
+            viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
+            className="w-full h-auto"
+            preserveAspectRatio="xMidYMid meet"
+          >
+            {rects.map((rect, i) => {
+              const c = TASK_COLORS[rect.file.colorIndex];
+              const isHovered = hoveredFile?.path === rect.file.path && hoveredFile?.taskKey === rect.file.taskKey;
+              const filename = shortPath(rect.file.path);
+              // Ensure minimum readable size for labels
+              const showFilename = rect.w > 50 && rect.h > 24;
+              const showStats = rect.w > 60 && rect.h > 42;
+
+              return (
+                <g
+                  key={`${rect.file.taskKey}-${rect.file.path}-${i}`}
+                  onMouseEnter={() => setHoveredFile(rect.file)}
+                  onMouseLeave={() => setHoveredFile(null)}
+                  className="cursor-pointer"
+                >
+                  <rect
+                    x={rect.x + 1.5}
+                    y={rect.y + 1.5}
+                    width={Math.max(rect.w - 3, 0)}
+                    height={Math.max(rect.h - 3, 0)}
+                    rx={4}
+                    fill={c.fill}
+                    fillOpacity={isHovered ? 0.35 : 0.12}
+                    stroke={c.fill}
+                    strokeOpacity={isHovered ? 0.9 : 0.25}
+                    strokeWidth={isHovered ? 2 : 1}
+                  />
+                  {showFilename && (
                     <text
                       x={rect.x + rect.w / 2}
-                      y={rect.y + rect.h / 2 - (rect.h > 50 ? 6 : 0)}
+                      y={rect.y + rect.h / 2 - (showStats ? 7 : 0)}
                       textAnchor="middle"
                       dominantBaseline="middle"
                       fill={c.fill}
-                      fontSize={Math.min(12, (rect.w / filename.length) * 1.4)}
+                      fontSize={Math.max(9, Math.min(12, (rect.w / filename.length) * 1.3))}
                       fontFamily="monospace"
-                      opacity={0.9}
+                      fontWeight="600"
+                      opacity={isHovered ? 1 : 0.85}
                     >
                       {filename}
                     </text>
-                    {rect.h > 50 && (
-                      <text
-                        x={rect.x + rect.w / 2}
-                        y={rect.y + rect.h / 2 + 12}
-                        textAnchor="middle"
-                        dominantBaseline="middle"
-                        fill={c.fill}
-                        fontSize={10}
-                        fontFamily="monospace"
-                        opacity={0.6}
-                      >
-                        +{rect.file.additions} -{rect.file.deletions}
-                      </text>
-                    )}
-                  </>
-                )}
-              </g>
-            );
-          })}
-        </svg>
+                  )}
+                  {showStats && (
+                    <text
+                      x={rect.x + rect.w / 2}
+                      y={rect.y + rect.h / 2 + 10}
+                      textAnchor="middle"
+                      dominantBaseline="middle"
+                      fill={c.fill}
+                      fontSize={9}
+                      fontFamily="monospace"
+                      opacity={0.5}
+                    >
+                      +{rect.file.additions} -{rect.file.deletions}
+                    </text>
+                  )}
+                </g>
+              );
+            })}
+          </svg>
 
-        {/* Hover tooltip */}
-        {hoveredFile && (
-          <div className="absolute top-4 right-4 bg-slate-800/90 backdrop-blur border border-slate-700 rounded-lg px-4 py-3 pointer-events-none z-10">
-            <div className="font-mono text-sm text-white">{hoveredFile.path}</div>
-            <div className="font-mono text-xs text-slate-400 mt-1">
-              <span className="text-emerald-400">+{hoveredFile.additions}</span>{" "}
-              <span className="text-red-400">-{hoveredFile.deletions}</span>
+          {/* Hover tooltip */}
+          {hoveredFile && (
+            <div className="absolute top-4 right-4 bg-slate-800/95 backdrop-blur-sm border border-slate-700 rounded-lg px-4 py-3 pointer-events-none z-10 shadow-xl">
+              <div className="font-mono text-sm text-white font-semibold">{hoveredFile.path}</div>
+              <div className="font-mono text-xs text-slate-400 mt-1.5 flex items-center gap-3">
+                <span className="text-emerald-400">+{hoveredFile.additions}</span>
+                <span className="text-red-400">-{hoveredFile.deletions}</span>
+                <span className="text-slate-500">({hoveredFile.total} total)</span>
+              </div>
+              <div className={`font-mono text-xs mt-1.5 ${TASK_COLORS[hoveredFile.colorIndex].text}`}>
+                {taskNameForKey(hoveredFile.taskKey)}
+              </div>
             </div>
-            <div className={`font-mono text-xs mt-1 ${TASK_COLORS[hoveredFile.colorIndex].text}`}>
-              {taskNameForKey(hoveredFile.taskKey)}
-            </div>
-          </div>
-        )}
-      </motion.div>
+          )}
+        </motion.div>
+      )}
 
       {/* File table */}
       <motion.div
@@ -349,17 +492,20 @@ export default function LiveFilesPage() {
                 >
                   Total{sortIndicator("total")}
                 </th>
+                <th className="px-4 py-3 w-32">Size</th>
               </tr>
             </thead>
             <tbody>
               {sortedFiles.map((file, i) => {
                 const c = TASK_COLORS[file.colorIndex];
+                const barPct = maxFileTotal > 0 ? (file.total / maxFileTotal) * 100 : 0;
+                const addPct = file.total > 0 ? (file.additions / file.total) * 100 : 0;
                 return (
                   <tr
                     key={`${file.taskKey}-${file.path}-${i}`}
                     className="border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors"
                   >
-                    <td className="px-4 py-2 text-slate-300 truncate max-w-xs">
+                    <td className="px-4 py-2 text-slate-300 truncate max-w-xs" title={file.path}>
                       {file.path}
                     </td>
                     <td className={`px-4 py-2 text-xs ${c.text}`}>
@@ -374,6 +520,17 @@ export default function LiveFilesPage() {
                     <td className="px-4 py-2 text-right text-slate-300">
                       {file.total}
                     </td>
+                    <td className="px-4 py-2">
+                      <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                        <div
+                          className="h-full rounded-full flex"
+                          style={{ width: `${barPct}%` }}
+                        >
+                          <div className="bg-emerald-400/70" style={{ width: `${addPct}%` }} />
+                          <div className="bg-red-400/70 flex-1" />
+                        </div>
+                      </div>
+                    </td>
                   </tr>
                 );
               })}
@@ -385,6 +542,7 @@ export default function LiveFilesPage() {
                 <td className="px-4 py-3 text-right text-emerald-400">+{totalAdditions}</td>
                 <td className="px-4 py-3 text-right text-red-400">-{totalDeletions}</td>
                 <td className="px-4 py-3 text-right">{totalAdditions + totalDeletions}</td>
+                <td className="px-4 py-3" />
               </tr>
             </tfoot>
           </table>

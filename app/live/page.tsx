@@ -118,46 +118,104 @@ function StatCard({
 
 // ─── Nav Cards ──────────────────────────────────────────────────────────────
 
-const navCards = [
+// SVG icon components for nav cards
+function ClockIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+    </svg>
+  );
+}
+function RobotIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 3v1.5M4.5 8.25H3m18 0h-1.5M4.5 12H3m18 0h-1.5m-15 3.75H3m18 0h-1.5M8.25 19.5V21M12 3v1.5m3.75-1.5v1.5m-7.5 15V21M12 19.5V21m3.75-1.5V21m-9-16.5h10.5a2.25 2.25 0 0 1 2.25 2.25v7.5a2.25 2.25 0 0 1-2.25 2.25H6.75a2.25 2.25 0 0 1-2.25-2.25v-7.5A2.25 2.25 0 0 1 6.75 4.5ZM9 10.5a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Zm6 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z" />
+    </svg>
+  );
+}
+function TaskIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15a2.25 2.25 0 0 1 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25ZM6.75 12h.008v.008H6.75V12Zm0 3h.008v.008H6.75V15Zm0 3h.008v.008H6.75V18Z" />
+    </svg>
+  );
+}
+function BranchIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M17.25 6.75 22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3-4.5 16.5" />
+    </svg>
+  );
+}
+function PromptIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="m6.75 7.5 3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0 0 21 18V6a2.25 2.25 0 0 0-2.25-2.25H5.25A2.25 2.25 0 0 0 3 6v12a2.25 2.25 0 0 0 2.25 2.25Z" />
+    </svg>
+  );
+}
+
+interface NavCard {
+  href: string;
+  title: string;
+  desc: string;
+  borderClass: string;
+  textClass: string;
+  glowColor: string;
+  icon: React.ReactNode;
+  badgeKey: "events" | "agents" | "tasks" | "commits" | "prompts";
+}
+
+const navCards: NavCard[] = [
   {
     href: "/live/timeline",
     title: "Live Timeline",
     desc: "Real-time events as agents work",
-    borderClass: "border-cyan-400/20 hover:border-cyan-400/40",
+    borderClass: "border-cyan-400/20 hover:border-cyan-400/50",
     textClass: "text-cyan-400",
-    icon: ">>",
+    glowColor: "rgba(34,211,238,0.08)",
+    icon: <ClockIcon className="w-5 h-5" />,
+    badgeKey: "events",
   },
   {
     href: "/live/agents",
     title: "Agent Monitor",
     desc: "Active agent cards with status & logs",
-    borderClass: "border-purple-500/20 hover:border-purple-500/40",
+    borderClass: "border-purple-500/20 hover:border-purple-500/50",
     textClass: "text-purple-500",
-    icon: "#_",
+    glowColor: "rgba(168,85,247,0.08)",
+    icon: <RobotIcon className="w-5 h-5" />,
+    badgeKey: "agents",
   },
   {
     href: "/live/tasks",
     title: "Task Queue",
     desc: "Active and completed agent tasks",
-    borderClass: "border-amber-400/20 hover:border-amber-400/40",
+    borderClass: "border-amber-400/20 hover:border-amber-400/50",
     textClass: "text-amber-400",
-    icon: "[]",
+    glowColor: "rgba(251,191,36,0.08)",
+    icon: <TaskIcon className="w-5 h-5" />,
+    badgeKey: "tasks",
   },
   {
     href: "/live/git",
     title: "Git Activity",
     desc: "Watch directories and track commits",
-    borderClass: "border-emerald-400/20 hover:border-emerald-400/40",
+    borderClass: "border-emerald-400/20 hover:border-emerald-400/50",
     textClass: "text-emerald-400",
-    icon: "~>",
+    glowColor: "rgba(52,211,153,0.08)",
+    icon: <BranchIcon className="w-5 h-5" />,
+    badgeKey: "commits",
   },
   {
     href: "/live/prompt",
     title: "Prompt Architecture",
     desc: "Prompts sent to coding agents",
-    borderClass: "border-purple-500/20 hover:border-purple-500/40",
+    borderClass: "border-purple-500/20 hover:border-purple-500/50",
     textClass: "text-purple-500",
-    icon: "$:",
+    glowColor: "rgba(168,85,247,0.08)",
+    icon: <PromptIcon className="w-5 h-5" />,
+    badgeKey: "prompts",
   },
 ];
 
@@ -194,6 +252,18 @@ export default function LiveOverviewPage() {
     }
     return count;
   }, [gitData]);
+
+  // Badge counts for nav cards
+  const badgeCounts = useMemo(
+    () => ({
+      events: sseEventsCount,
+      agents: activeAgents,
+      tasks: totalTasks,
+      commits: totalCommits,
+      prompts: 0, // prompts are loaded on-demand
+    }),
+    [sseEventsCount, activeAgents, totalTasks, totalCommits]
+  );
 
   return (
     <div className="p-4 md:p-8 pt-6 space-y-8 max-w-7xl mx-auto">
@@ -454,33 +524,66 @@ export default function LiveOverviewPage() {
           <span className="text-slate-400">&gt;</span> Explore
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {navCards.map((card, i) => (
-            <Link key={card.href} href={card.href}>
-              <motion.div
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.65 + i * 0.08 }}
-                className={`bg-slate-900/50 border ${card.borderClass} rounded-lg p-4 transition-all cursor-pointer group`}
-                whileHover={{ scale: 1.02, y: -2 }}
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <span
-                    className={`text-xs font-mono ${card.textClass} opacity-50 group-hover:opacity-100 transition-opacity`}
-                  >
-                    {card.icon}
-                  </span>
-                  <h3
-                    className={`text-sm font-mono font-semibold ${card.textClass}`}
-                  >
-                    {card.title}
-                  </h3>
-                </div>
-                <p className="text-xs font-mono text-slate-400">
-                  {card.desc}
-                </p>
-              </motion.div>
-            </Link>
-          ))}
+          {navCards.map((card, i) => {
+            const count = badgeCounts[card.badgeKey];
+            return (
+              <Link key={card.href} href={card.href}>
+                <motion.div
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.65 + i * 0.08 }}
+                  className={`relative bg-slate-900/50 border ${card.borderClass} rounded-lg p-4 transition-all cursor-pointer group overflow-hidden`}
+                  whileHover={{ scale: 1.02, y: -2 }}
+                  style={{
+                    boxShadow: "none",
+                  }}
+                  onHoverStart={(e) => {
+                    const el = e.target as HTMLElement;
+                    const container = el.closest("[style]") as HTMLElement;
+                    if (container) container.style.boxShadow = `0 0 24px 2px ${card.glowColor}, 0 0 48px 4px ${card.glowColor}`;
+                  }}
+                  onHoverEnd={(e) => {
+                    const el = e.target as HTMLElement;
+                    const container = el.closest("[style]") as HTMLElement;
+                    if (container) container.style.boxShadow = "none";
+                  }}
+                >
+                  {/* Subtle background glow on hover */}
+                  <div
+                    className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
+                    style={{
+                      background: `radial-gradient(ellipse at center, ${card.glowColor} 0%, transparent 70%)`,
+                    }}
+                  />
+
+                  <div className="relative">
+                    <div className="flex items-center gap-2.5 mb-1.5">
+                      <span
+                        className={`${card.textClass} opacity-60 group-hover:opacity-100 transition-opacity`}
+                      >
+                        {card.icon}
+                      </span>
+                      <h3
+                        className={`text-sm font-mono font-semibold ${card.textClass}`}
+                      >
+                        {card.title}
+                      </h3>
+                      {count > 0 && (
+                        <span
+                          className={`ml-auto text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-full ${card.textClass} bg-slate-800/80 border border-slate-700/50`}
+                        >
+                          {count}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs font-mono text-slate-400">
+                      {card.desc}
+                    </p>
+                  </div>
+                </motion.div>
+              </Link>
+            );
+          })}
         </div>
       </motion.section>
     </div>
