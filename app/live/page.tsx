@@ -287,7 +287,7 @@ export default function LiveOverviewPage() {
 
         <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
           <div>
-            <div className="flex items-center gap-3 mb-3">
+            <div className="flex items-center gap-3 mb-3 mt-4">
               {/* Animated pulse dot */}
               <motion.span
                 className="relative flex h-3 w-3"

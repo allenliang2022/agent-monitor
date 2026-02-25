@@ -69,7 +69,7 @@ export default function Navbar() {
                   {isActive && (
                     <motion.div
                       layoutId="navbar-active"
-                      className="absolute inset-0 border rounded-md bg-cyan-400/15 border-cyan-400/30"
+                      className="absolute inset-0 rounded-md nav-active-gradient"
                       transition={{ type: "spring", bounce: 0.2, duration: 0.4 }}
                     />
                   )}

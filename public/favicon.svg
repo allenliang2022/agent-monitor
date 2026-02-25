@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#00d4ff"/>
+      <stop offset="100%" stop-color="#9333ea"/>
+    </linearGradient>
+  </defs>
+  <!-- Terminal body -->
+  <rect x="2" y="4" width="28" height="24" rx="4" fill="#0a0a1a" stroke="url(#g)" stroke-width="1.5"/>
+  <!-- Title bar -->
+  <rect x="2" y="4" width="28" height="6" rx="4" fill="#111128"/>
+  <rect x="2" y="7" width="28" height="3" fill="#111128"/>
+  <!-- Title bar dots -->
+  <circle cx="6.5" cy="7" r="1.2" fill="#ef4444"/>
+  <circle cx="10.5" cy="7" r="1.2" fill="#f59e0b"/>
+  <circle cx="14.5" cy="7" r="1.2" fill="#22c55e"/>
+  <!-- Prompt line 1 -->
+  <path d="M7 16 L11 19 L7 22" stroke="#00d4ff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <!-- Cursor block -->
+  <rect x="14" y="18" width="8" height="2.5" rx="0.5" fill="#00d4ff" opacity="0.8"/>
+</svg>

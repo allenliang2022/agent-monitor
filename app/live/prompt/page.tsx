@@ -176,7 +176,7 @@ export default function LivePromptPage() {
                   >
                     <button
                       onClick={() => setExpandedPrompt(isExpanded ? null : prompt.filename)}
-                      className="w-full text-left px-4 py-3 hover:bg-slate-800/30 transition-colors"
+                      className="w-full text-left px-4 py-3 hover:bg-slate-800/30 transition-colors cursor-pointer"
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3 min-w-0">

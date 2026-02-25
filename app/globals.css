@@ -2,6 +2,7 @@
 
 html {
   background: #0a0a1a;
+  scroll-behavior: smooth;
 }
 
 :root {
@@ -109,11 +110,27 @@ body {
   display: none;
 }
 
+/* Gradient border animation for active nav items */
+@keyframes gradient-border {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.nav-active-gradient {
+  background: linear-gradient(90deg, rgba(0, 212, 255, 0.3), rgba(147, 51, 234, 0.3), rgba(0, 212, 255, 0.3));
+  background-size: 200% 100%;
+  animation: gradient-border 3s ease infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-pulse-dot {
     animation: none;
   }
   .scanline::after {
+    animation: none;
+  }
+  .nav-active-gradient {
     animation: none;
   }
 }
