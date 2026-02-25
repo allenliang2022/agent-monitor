@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { useLive } from "../LiveContext";
 import type { AgentTask, FileChangesResult } from "../LiveContext";
+import { AgentGridSkeleton, useMinimumLoading } from "../components/LoadingSkeleton";
 
 // ─── Progress steps ─────────────────────────────────────────────────────────
 
@@ -582,7 +583,8 @@ function AgentCard({
 // ─── Page ───────────────────────────────────────────────────────────────────
 
 export default function LiveAgentsPage() {
-  const { tasks, fileChanges } = useLive();
+  const { tasks, fileChanges, initialLoading } = useLive();
+  const dataReady = useMinimumLoading(!initialLoading);
 
   // Map file changes by worktree path for each task
   const taskFileData = useMemo(() => {
@@ -594,6 +596,21 @@ export default function LiveAgentsPage() {
     }
     return map;
   }, [tasks, fileChanges]);
+
+  if (!dataReady) {
+    return (
+      <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8">
+        <div className="flex items-center justify-between">
+          <div className="space-y-2">
+            <div className="h-8 w-64 rounded-lg bg-slate-800/60 animate-pulse" />
+            <div className="h-4 w-40 rounded bg-slate-800/60 animate-pulse" />
+          </div>
+          <div className="h-7 w-16 rounded-lg bg-slate-800/60 animate-pulse" />
+        </div>
+        <AgentGridSkeleton count={3} />
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8">
@@ -626,16 +643,60 @@ export default function LiveAgentsPage() {
       {/* ── Agent Cards Grid ─────────────────────────────────────────────── */}
       {tasks.length === 0 ? (
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="bg-slate-900/50 border border-slate-700 rounded-xl p-12 text-center"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="relative bg-slate-900/50 border border-slate-700 rounded-xl p-16 flex flex-col items-center justify-center text-center overflow-hidden"
         >
-          <div className="text-slate-300 font-mono text-sm mb-2">
-            No active agents.
-          </div>
-          <div className="text-slate-400 font-mono text-xs">
-            Spawn one to get started.
-          </div>
+          {/* Subtle animated background */}
+          <motion.div
+            animate={{ opacity: [0.02, 0.06, 0.02] }}
+            transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
+            className="absolute inset-0 bg-gradient-to-br from-purple-500/10 via-transparent to-cyan-400/10 pointer-events-none"
+          />
+
+          {/* Animated robot icon */}
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ delay: 0.15, type: "spring", stiffness: 200 }}
+            className="relative mb-6"
+          >
+            <motion.div
+              animate={{ y: [0, -3, 0] }}
+              transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut" }}
+            >
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500/15 to-cyan-400/15 border border-purple-500/20 flex items-center justify-center">
+                <svg className="w-8 h-8 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 3v1.5M4.5 8.25H3m18 0h-1.5M4.5 12H3m18 0h-1.5m-15 3.75H3m18 0h-1.5M8.25 19.5V21M12 3v1.5m3.75-1.5v1.5m-7.5 15V21M12 19.5V21m3.75-1.5V21m-9-16.5h10.5a2.25 2.25 0 0 1 2.25 2.25v7.5a2.25 2.25 0 0 1-2.25 2.25H6.75a2.25 2.25 0 0 1-2.25-2.25v-7.5A2.25 2.25 0 0 1 6.75 4.5ZM9 10.5a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Zm6 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z" />
+                </svg>
+              </div>
+            </motion.div>
+            {/* Pulse ring */}
+            <motion.div
+              animate={{ scale: [1, 1.4, 1], opacity: [0.3, 0, 0.3] }}
+              transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut" }}
+              className="absolute inset-0 rounded-2xl border border-purple-500/20"
+            />
+          </motion.div>
+
+          <motion.h3
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="text-lg font-semibold text-slate-200 mb-2"
+          >
+            No agents running
+          </motion.h3>
+
+          <motion.p
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            className="text-sm font-mono text-slate-400 max-w-xs"
+          >
+            Start a task to see agents appear here
+          </motion.p>
         </motion.div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">

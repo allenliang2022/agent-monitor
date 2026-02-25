@@ -65,7 +65,7 @@ export default function AgentPage() {
 
   // Find current or most recent task
   const runningTask = tasks.find((t) => t.status === "running");
-  const latestTask = runningTask ?? tasks.sort((a, b) => {
+  const latestTask = runningTask ?? [...tasks].sort((a, b) => {
     const aTime = new Date(a.startedAt).getTime();
     const bTime = new Date(b.startedAt).getTime();
     return bTime - aTime;
@@ -84,6 +84,8 @@ export default function AgentPage() {
 
   const selectedTask = tasks.find((t) => t.id === selectedTaskId) ?? latestTask;
   const isActive = selectedTask?.tmuxAlive || selectedTask?.status === "running";
+  const hasNoRunning = !runningTask;
+  const showTaskSelector = tasks.length > 0 && (tasks.length > 1 || hasNoRunning);
 
   const { lines, scrollRef } = useAgentLog(selectedTask?.id ?? null);
 
@@ -91,6 +93,71 @@ export default function AgentPage() {
     .filter((t) => t.status === "completed" || t.status === "done")
     .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())
     .slice(0, 5);
+
+  // ── No tasks at all: empty state ──────────────────────────────────────
+  if (tasks.length === 0) {
+    return (
+      <div className="p-4 md:p-8 space-y-6">
+        <motion.section
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <h2 className="text-sm font-mono text-purple-400 mb-3 flex items-center gap-2">
+            <span className="text-purple-400/50">&gt;</span> Agent Process
+          </h2>
+
+          <div className="relative bg-slate-900/50 border border-slate-800/50 rounded-xl p-16 flex flex-col items-center justify-center text-center overflow-hidden">
+            <motion.div
+              animate={{ opacity: [0.02, 0.06, 0.02] }}
+              transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
+              className="absolute inset-0 bg-gradient-to-br from-cyan-400/10 via-transparent to-purple-500/10 pointer-events-none"
+            />
+
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ delay: 0.15, type: "spring", stiffness: 200 }}
+              className="relative mb-6"
+            >
+              <motion.div
+                animate={{ y: [0, -3, 0] }}
+                transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut" }}
+              >
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-cyan-400/15 to-purple-500/15 border border-cyan-400/20 flex items-center justify-center">
+                  <svg className="w-8 h-8 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="m6.75 7.5 3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0 0 21 18V6a2.25 2.25 0 0 0-2.25-2.25H5.25A2.25 2.25 0 0 0 3 6v12a2.25 2.25 0 0 0 2.25 2.25Z" />
+                  </svg>
+                </div>
+              </motion.div>
+              <motion.div
+                animate={{ scale: [1, 1.4, 1], opacity: [0.3, 0, 0.3] }}
+                transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut" }}
+                className="absolute inset-0 rounded-2xl border border-cyan-400/20"
+              />
+            </motion.div>
+
+            <motion.h3
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+              className="text-lg font-semibold text-slate-200 mb-2"
+            >
+              No agent process
+            </motion.h3>
+
+            <motion.p
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4 }}
+              className="text-sm font-mono text-slate-400 max-w-xs"
+            >
+              Spawn a task to see live agent output here
+            </motion.p>
+          </div>
+        </motion.section>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 md:p-8 space-y-6">
@@ -127,8 +194,8 @@ export default function AgentPage() {
             </div>
 
             <div className="flex items-center gap-2">
-              {/* Task selector */}
-              {tasks.length > 1 && (
+              {/* Task selector — shown when multiple tasks or no running task */}
+              {showTaskSelector && (
                 <select
                   value={selectedTaskId}
                   onChange={(e) => setSelectedTaskId(e.target.value)}

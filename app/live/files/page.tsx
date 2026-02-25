@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { useLive } from "../LiveContext";
 import type { FileChange } from "../LiveContext";
+import { FilesSkeleton, useMinimumLoading } from "../components/LoadingSkeleton";
 
 // Color palette per task index
 const TASK_COLORS = [
@@ -223,7 +224,8 @@ function FileCard({
 // ─── Main Page ──────────────────────────────────────────────────────────────
 
 export default function LiveFilesPage() {
-  const { fileChanges, tasks } = useLive();
+  const { fileChanges, tasks, initialLoading } = useLive();
+  const dataReady = useMinimumLoading(!initialLoading);
   const [hoveredFile, setHoveredFile] = useState<TreemapFile | null>(null);
   const [sortField, setSortField] = useState<"total" | "additions" | "deletions" | "path">("total");
   const [sortAsc, setSortAsc] = useState(false);
@@ -295,6 +297,18 @@ export default function LiveFilesPage() {
     sortField === field ? (sortAsc ? " ▲" : " ▼") : "";
 
   const useFewFilesLayout = allFiles.length > 0 && allFiles.length <= 5;
+
+  if (!dataReady) {
+    return (
+      <div className="p-6 max-w-7xl mx-auto space-y-6">
+        <div className="space-y-2">
+          <div className="h-6 w-36 rounded bg-slate-800/60 animate-pulse" />
+          <div className="h-3 w-64 rounded bg-slate-800/60 animate-pulse" />
+        </div>
+        <FilesSkeleton />
+      </div>
+    );
+  }
 
   if (allFiles.length === 0) {
     return (
