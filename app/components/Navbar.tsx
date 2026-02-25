@@ -4,30 +4,38 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
 
-const navItems: { href: string; label: string; icon: string; live?: boolean }[] = [
-  { href: "/", label: "Overview", icon: "+" },
-  { href: "/timeline", label: "Timeline", icon: ">" },
-  { href: "/status", label: "Status", icon: "#" },
-  { href: "/files", label: "Files", icon: "=" },
-  { href: "/animations", label: "Animations", icon: "~" },
-  { href: "/monitoring", label: "Monitoring", icon: "@" },
-  { href: "/prompt", label: "Prompt", icon: "$" },
-  { href: "/architecture", label: "Architecture", icon: "&" },
-  { href: "/live", label: "Live", icon: "*", live: true },
+const navItems: { href: string; label: string; icon: string }[] = [
+  { href: "/live", label: "Overview", icon: "+" },
+  { href: "/live/timeline", label: "Timeline", icon: ">>" },
+  { href: "/live/agents", label: "Agents", icon: "#" },
+  { href: "/live/tasks", label: "Tasks", icon: ">" },
+  { href: "/live/agent", label: "Agent", icon: "_" },
+  { href: "/live/git", label: "Git", icon: "~" },
+  { href: "/live/files", label: "Files", icon: "%" },
+  { href: "/live/monitoring", label: "Monitoring", icon: "@" },
+  { href: "/live/architecture", label: "Architecture", icon: "&" },
+  { href: "/live/prompt", label: "Prompt", icon: "$" },
 ];
 
 export default function Navbar() {
   const pathname = usePathname();
 
   return (
-    <nav className="sticky top-0 z-40 backdrop-blur-md bg-slate-950/80 border-b border-slate-800/50">
+    <nav className="sticky top-0 z-50 backdrop-blur-md bg-slate-950/80 border-b border-slate-800/50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center h-14 gap-1 overflow-x-auto scrollbar-hide">
-          <Link href="/" className="shrink-0 mr-4">
+        <div className="flex items-center h-12 gap-1 overflow-x-auto scrollbar-hide">
+          <Link href="/live" className="shrink-0 mr-4 flex items-center gap-2">
             <span className="text-cyan-400 font-mono font-bold text-sm">ASM</span>
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+            </span>
           </Link>
           {navItems.map((item) => {
-            const isActive = pathname === item.href;
+            const isActive =
+              item.href === "/live"
+                ? pathname === "/live"
+                : pathname.startsWith(item.href);
             return (
               <Link
                 key={item.href}
@@ -41,23 +49,11 @@ export default function Navbar() {
                 {isActive && (
                   <motion.div
                     layoutId="navbar-active"
-                    className={`absolute inset-0 border rounded-md ${
-                      item.live
-                        ? "bg-green-400/15 border-green-400/30"
-                        : "bg-cyan-400/15 border-cyan-400/30"
-                    }`}
+                    className="absolute inset-0 border rounded-md bg-cyan-400/15 border-cyan-400/30"
                     transition={{ type: "spring", bounce: 0.2, duration: 0.4 }}
                   />
                 )}
-                <span className="relative flex items-center gap-1.5">
-                  {item.live && (
-                    <span className="relative flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
-                    </span>
-                  )}
-                  {item.label}
-                </span>
+                <span className="relative">{item.label}</span>
               </Link>
             );
           })}
