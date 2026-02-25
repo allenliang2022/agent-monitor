@@ -3,6 +3,7 @@ import { readFile } from "fs/promises";
 import { join } from "path";
 import { existsSync } from "fs";
 import { execSync } from "child_process";
+import { getFileChanges, execGit } from "../../lib/git-changes";
 
 export const dynamic = "force-dynamic";
 
@@ -94,9 +95,9 @@ export async function GET() {
         try {
           const wtPath = typeof worktreePath === 'string' ? worktreePath : '';
           if (wtPath && existsSync(wtPath)) {
-            const branchCommits = execSync(
-              `cd "${wtPath}" && git log --oneline HEAD --not $(git merge-base HEAD main) 2>/dev/null | wc -l`,
-              { encoding: "utf-8", timeout: 3000, stdio: "pipe" }
+            const branchCommits = execGit(
+              "git log --oneline HEAD --not main 2>/dev/null | wc -l",
+              wtPath
             ).trim();
             if (parseInt(branchCommits) > 0) {
               inferredStatus = "completed";
@@ -111,37 +112,32 @@ export async function GET() {
         }
       }
 
-      // Get file changes for this worktree
-      let fileCount = 0;
-      let additions = 0;
-      let deletions = 0;
-      try {
-        const wtPath = typeof worktreePath === 'string' ? worktreePath : '';
-        if (wtPath && existsSync(wtPath)) {
-          const diffStat = execSync(
-            `cd "${wtPath}" && git diff --stat main..HEAD 2>/dev/null || git diff --stat HEAD~1..HEAD 2>/dev/null || echo ""`,
-            { encoding: "utf-8", timeout: 5000, stdio: "pipe" }
-          );
-          const lines = diffStat.trim().split("\n");
-          for (const line of lines) {
-            const match = line.match(/(\d+) insertions?\(\+\)/);
-            const match2 = line.match(/(\d+) deletions?\(-\)/);
-            const matchFiles = line.match(/(\d+) files? changed/);
-            if (matchFiles) fileCount = parseInt(matchFiles[1]);
-            if (match) additions = parseInt(match[1]);
-            if (match2) deletions = parseInt(match2[1]);
-          }
+      // Get file changes using the shared detection logic
+      let liveFileCount = 0;
+      let liveAdditions = 0;
+      let liveDeletions = 0;
+      let liveFiles: { path: string; additions: number; deletions: number }[] = [];
+
+      const wtPath = typeof worktreePath === 'string' ? worktreePath : '';
+      if (wtPath && existsSync(wtPath)) {
+        const changes = getFileChanges(wtPath);
+        if (changes) {
+          liveFileCount = changes.totalFiles;
+          liveAdditions = changes.totalAdditions;
+          liveDeletions = changes.totalDeletions;
+          liveFiles = changes.files;
         }
-      } catch { /* ignore */ }
+      }
 
       return {
         ...task,
         tmuxAlive,
         worktreePath,
         status: inferredStatus,
-        liveFileCount: fileCount,
-        liveAdditions: additions,
-        liveDeletions: deletions,
+        liveFileCount,
+        liveAdditions,
+        liveDeletions,
+        liveFiles,
       };
     });
 

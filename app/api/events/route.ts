@@ -1,6 +1,12 @@
 import { readFileSync, existsSync } from "fs";
 import { join } from "path";
 import { execSync } from "child_process";
+import {
+  getFileChanges,
+  execGit,
+  type FileChange,
+  type FileChangesResult,
+} from "../../lib/git-changes";
 
 export const dynamic = "force-dynamic";
 
@@ -41,19 +47,6 @@ interface RawTask {
   worktree?: string;
   tmuxSession?: string;
   [key: string]: unknown;
-}
-
-interface FileChange {
-  path: string;
-  additions: number;
-  deletions: number;
-}
-
-interface FileChangesResult {
-  directory: string;
-  files: FileChange[];
-  totalAdditions: number;
-  totalDeletions: number;
 }
 
 function readSessionStore(agentId: string) {
@@ -102,14 +95,6 @@ function getGitStatus(dir: string): Record<string, unknown> | null {
   }
 }
 
-function execGit(cmd: string, cwd: string): string {
-  try {
-    return execSync(cmd, { cwd, encoding: "utf-8", timeout: 10000, stdio: "pipe" }).trim();
-  } catch {
-    return "";
-  }
-}
-
 function checkTmuxSession(sessionName: string): boolean {
   try {
     execSync(`tmux has-session -t ${sessionName}`, {
@@ -131,7 +116,7 @@ function readActiveTasks() {
     const rawTasks: RawTask[] = Array.isArray(data) ? data : data.tasks || [];
 
     return rawTasks.map((task) => {
-            const tmuxSession = task.tmuxSession || task.id || "";
+      const tmuxSession = task.tmuxSession || task.id || "";
       const tmuxAlive = tmuxSession ? checkTmuxSession(tmuxSession) : false;
       const worktreeDir = task.worktree || task.id;
       const worktreePath = worktreeDir ? join(WORKTREE_BASE, worktreeDir) : undefined;
@@ -143,7 +128,7 @@ function readActiveTasks() {
           const wtPath = typeof worktreePath === 'string' ? worktreePath : '';
           if (wtPath && existsSync(wtPath)) {
             const branchCommits = execGit(
-              "git log --oneline HEAD --not $(git merge-base HEAD main 2>/dev/null || echo HEAD~0) 2>/dev/null | wc -l",
+              "git log --oneline HEAD --not main 2>/dev/null | wc -l",
               wtPath
             ).trim();
             inferredStatus = parseInt(branchCommits) > 0 ? "completed" : "dead";
@@ -155,20 +140,19 @@ function readActiveTasks() {
         }
       }
 
-      // Get file stats
+      // Get file stats using the shared detection logic
       let liveFileCount = 0, liveAdditions = 0, liveDeletions = 0;
-      try {
-        const wtPath = typeof worktreePath === 'string' ? worktreePath : '';
-        if (wtPath && existsSync(wtPath)) {
-          const diffStat = execGit("git diff --stat HEAD~1..HEAD", wtPath);
-          const matchF = diffStat.match(/(\d+) files? changed/);
-          const matchA = diffStat.match(/(\d+) insertions?\(\+\)/);
-          const matchD = diffStat.match(/(\d+) deletions?\(-\)/);
-          if (matchF) liveFileCount = parseInt(matchF[1]);
-          if (matchA) liveAdditions = parseInt(matchA[1]);
-          if (matchD) liveDeletions = parseInt(matchD[1]);
+      let liveFiles: FileChange[] = [];
+      const wtPath = typeof worktreePath === 'string' ? worktreePath : '';
+      if (wtPath && existsSync(wtPath)) {
+        const changes = getFileChanges(wtPath);
+        if (changes) {
+          liveFileCount = changes.totalFiles;
+          liveAdditions = changes.totalAdditions;
+          liveDeletions = changes.totalDeletions;
+          liveFiles = changes.files;
         }
-      } catch { /* ignore */ }
+      }
 
       return {
         ...task,
@@ -178,63 +162,11 @@ function readActiveTasks() {
         liveFileCount,
         liveAdditions,
         liveDeletions,
+        liveFiles,
       };
     });
   } catch {
     return [];
-  }
-}
-
-function getFileChanges(dir: string): FileChangesResult | null {
-  if (!existsSync(dir)) return null;
-  try {
-    let diffRef = "HEAD~10";
-    const mergeBase = execGit("git merge-base main HEAD", dir);
-    if (mergeBase) diffRef = mergeBase;
-
-    const numstat = execGit(`git diff --numstat ${diffRef}..HEAD`, dir);
-    const uncommittedNumstat = execGit("git diff --numstat", dir);
-
-    const fileMap = new Map<string, FileChange>();
-
-    const parseNumstat = (output: string) => {
-      if (!output) return;
-      for (const line of output.split("\n")) {
-        if (!line.trim()) continue;
-        const parts = line.split("\t");
-        if (parts.length < 3) continue;
-        const additions = parts[0] === "-" ? 0 : parseInt(parts[0], 10) || 0;
-        const deletions = parts[1] === "-" ? 0 : parseInt(parts[1], 10) || 0;
-        const filePath = parts[2];
-        if (!filePath) continue;
-
-        const existing = fileMap.get(filePath);
-        if (existing) {
-          existing.additions += additions;
-          existing.deletions += deletions;
-        } else {
-          fileMap.set(filePath, { path: filePath, additions, deletions });
-        }
-      }
-    };
-
-    parseNumstat(numstat);
-    parseNumstat(uncommittedNumstat);
-
-    const files = Array.from(fileMap.values()).sort(
-      (a, b) => b.additions + b.deletions - (a.additions + a.deletions)
-    );
-
-    let totalAdditions = 0;
-    let totalDeletions = 0;
-    for (const f of files) {
-      totalAdditions += f.additions;
-      totalDeletions += f.deletions;
-    }
-
-    return { directory: dir, files, totalAdditions, totalDeletions };
-  } catch {
-    return null;
   }
 }
 
@@ -261,7 +193,7 @@ function collectData() {
   // Read active tasks with tmux status
   const tasks = readActiveTasks();
 
-  // Collect file changes for each task's worktree
+  // Collect file changes for each task's worktree using the shared logic
   const fileChanges: Record<string, FileChangesResult> = {};
   for (const task of tasks) {
     if (task.worktreePath && existsSync(task.worktreePath)) {
