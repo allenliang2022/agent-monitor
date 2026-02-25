@@ -28,6 +28,7 @@ export interface AgentTask {
   liveFileCount?: number;
   liveAdditions?: number;
   liveDeletions?: number;
+  liveFiles?: FileChange[];
   summary?: string;
   tmuxAlive: boolean;
   worktreePath?: string;
@@ -43,6 +44,7 @@ export interface FileChange {
 export interface FileChangesResult {
   directory: string;
   files: FileChange[];
+  totalFiles: number;
   totalAdditions: number;
   totalDeletions: number;
 }
