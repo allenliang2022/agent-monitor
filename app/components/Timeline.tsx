@@ -7,12 +7,12 @@ import sessionData from "@/data/swarm-session.json";
 type TimelineEvent = (typeof sessionData.timeline)[number];
 
 const eventColors: Record<string, { dot: string; bg: string; border: string; text: string }> = {
-  request: { dot: "bg-amber", bg: "bg-amber/10", border: "border-amber/20", text: "text-amber" },
-  analyze: { dot: "bg-purple", bg: "bg-purple/10", border: "border-purple/20", text: "text-purple" },
-  prompt: { dot: "bg-purple", bg: "bg-purple/10", border: "border-purple/20", text: "text-purple" },
-  spawn: { dot: "bg-cyan", bg: "bg-cyan/10", border: "border-cyan/20", text: "text-cyan" },
-  check: { dot: "bg-cyan", bg: "bg-cyan/10", border: "border-cyan/20", text: "text-cyan" },
-  verify: { dot: "bg-green", bg: "bg-green/10", border: "border-green/20", text: "text-green" },
+  request: { dot: "bg-amber-400", bg: "bg-amber-400/10", border: "border-amber-400/20", text: "text-amber-400" },
+  analyze: { dot: "bg-purple-500", bg: "bg-purple-500/10", border: "border-purple-500/20", text: "text-purple-500" },
+  prompt: { dot: "bg-purple-500", bg: "bg-purple-500/10", border: "border-purple-500/20", text: "text-purple-500" },
+  spawn: { dot: "bg-cyan-400", bg: "bg-cyan-400/10", border: "border-cyan-400/20", text: "text-cyan-400" },
+  check: { dot: "bg-cyan-400", bg: "bg-cyan-400/10", border: "border-cyan-400/20", text: "text-cyan-400" },
+  verify: { dot: "bg-emerald-400", bg: "bg-emerald-400/10", border: "border-emerald-400/20", text: "text-emerald-400" },
 };
 
 function getEventStyle(event: string) {
@@ -24,7 +24,7 @@ function CommandBlock({ commands }: { commands: string[] }) {
     <div className="mt-3 rounded-lg bg-black/50 border border-slate-700/50 p-3 font-mono text-xs overflow-x-auto">
       {commands.map((cmd, i) => (
         <div key={i} className="flex gap-2">
-          <span className="text-green shrink-0">$</span>
+          <span className="text-emerald-400 shrink-0">$</span>
           <span className="text-slate-300">{cmd}</span>
         </div>
       ))}
@@ -37,12 +37,12 @@ function ResultsBlock({ results }: { results: Record<string, unknown> }) {
     <div className="mt-2 rounded-lg bg-black/30 border border-slate-700/30 p-3 font-mono text-xs">
       {Object.entries(results).map(([key, value]) => (
         <div key={key} className="flex gap-2 mb-1 last:mb-0">
-          <span className="text-purple shrink-0">{key}:</span>
+          <span className="text-purple-500 shrink-0">{key}:</span>
           <span className={`${
-            value === "ALIVE" ? "text-green" :
-            value === "DEAD" ? "text-red" :
-            value === true ? "text-green" :
-            value === false ? "text-amber" :
+            value === "ALIVE" ? "text-emerald-400" :
+            value === "DEAD" ? "text-red-400" :
+            value === true ? "text-emerald-400" :
+            value === false ? "text-amber-400" :
             "text-slate-300"
           }`}>
             {Array.isArray(value) ? value.join(", ") : String(value)}
@@ -116,7 +116,7 @@ export default function Timeline() {
         >
           <div>
             <h2 className="text-2xl sm:text-3xl font-bold">
-              <span className="bg-gradient-to-r from-cyan to-purple bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-cyan-400 to-purple-500 bg-clip-text text-transparent">
                 Session Timeline
               </span>
             </h2>
@@ -131,8 +131,8 @@ export default function Timeline() {
             onClick={autoPlaying ? stopAutoPlay : startAutoPlay}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg font-mono text-sm border transition-colors ${
               autoPlaying
-                ? "border-red/30 bg-red/10 text-red hover:bg-red/20"
-                : "border-cyan/30 bg-cyan/10 text-cyan hover:bg-cyan/20"
+                ? "border-red-400/30 bg-red-400/10 text-red-400 hover:bg-red-400/20"
+                : "border-cyan-400/30 bg-cyan-400/10 text-cyan-400 hover:bg-cyan-400/20"
             }`}
           >
             {autoPlaying ? (
@@ -157,7 +157,7 @@ export default function Timeline() {
         {/* Timeline */}
         <div className="relative">
           {/* Vertical line */}
-          <div className="absolute left-[19px] top-0 bottom-0 w-px bg-gradient-to-b from-cyan/30 via-purple/30 to-green/30" />
+          <div className="absolute left-[19px] top-0 bottom-0 w-px bg-gradient-to-b from-cyan-400/30 via-purple-500/30 to-emerald-400/30" />
 
           {events.map((event, i) => {
             const style = getEventStyle(event.event);
@@ -189,7 +189,7 @@ export default function Timeline() {
                   }}
                   whileHover={!autoPlaying ? { x: 4 } : {}}
                   className={`rounded-xl border ${style.border} ${style.bg} p-4 cursor-pointer transition-all ${
-                    isActive ? "ring-1 ring-cyan/40" : ""
+                    isActive ? "ring-1 ring-cyan-400/40" : ""
                   }`}
                 >
                   <div className="flex items-start justify-between gap-3">
@@ -245,7 +245,7 @@ export default function Timeline() {
                           {"assessment" in event && event.assessment && (
                             <div className="mt-3 flex items-start gap-2">
                               <span className="text-xs font-mono text-slate-500 uppercase tracking-wider shrink-0">Assessment:</span>
-                              <span className="text-sm text-green">{event.assessment as string}</span>
+                              <span className="text-sm text-emerald-400">{event.assessment as string}</span>
                             </div>
                           )}
                         </div>
