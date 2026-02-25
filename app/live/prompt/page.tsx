@@ -9,6 +9,33 @@ interface PromptFile {
   filename: string;
   content: string;
   agent: string;
+  taskId: string;
+  status: string;
+  startedAt: number | null;
+}
+
+// Status color mapping
+function statusColor(status: string): string {
+  switch (status) {
+    case "running": return "#22d3ee";
+    case "completed": case "done": case "ready_for_review": return "#22c55e";
+    case "failed": case "ci_failed": case "dead": return "#ef4444";
+    case "pending": case "ci_pending": return "#f59e0b";
+    default: return "#64748b";
+  }
+}
+
+function statusLabel(status: string): string {
+  return status === "unknown" ? "unknown" : status;
+}
+
+// Rough token estimation: ~4 chars per token for English text, ~3.5 for code-heavy
+function estimateTokens(text: string): number {
+  return Math.ceil(text.length / 3.8);
+}
+
+function wordCount(text: string): number {
+  return text.split(/\s+/).filter(Boolean).length;
 }
 
 export default function LivePromptPage() {
@@ -23,33 +50,41 @@ export default function LivePromptPage() {
   const [logLoading, setLogLoading] = useState(false);
   const logContainerRef = useRef<HTMLDivElement>(null);
 
-  // Active tasks for the dropdown
-  const activeTasks = tasks.filter((t) => t.status === "running" || t.status === "pending" || t.status === "ci_pending");
-
   // Auto-select first task (prefer running, fallback to any)
   useEffect(() => {
     if (!selectedTask) {
-      if (activeTasks.length > 0) {
-        setSelectedTask(activeTasks[0].id);
+      const running = tasks.find((t) => t.status === "running");
+      if (running) {
+        setSelectedTask(running.id);
       } else if (tasks.length > 0) {
         setSelectedTask(tasks[0].id);
       }
     }
-  }, [activeTasks, tasks, selectedTask]);
+  }, [tasks, selectedTask]);
 
   // Fetch prompts
   useEffect(() => {
     fetch("/api/prompts")
       .then((r) => r.json())
       .then((data) => {
-        setPrompts(data.prompts || []);
-        if (data.prompts?.length > 0) {
-          setExpandedPrompt(data.prompts[0].filename);
+        const promptList: PromptFile[] = data.prompts || [];
+        setPrompts(promptList);
+        if (promptList.length > 0) {
+          setExpandedPrompt(promptList[0].filename);
         }
         setLoading(false);
       })
       .catch(() => setLoading(false));
   }, []);
+
+  // Match prompt status to live task status from LiveContext
+  const enrichedPrompts = prompts.map((prompt) => {
+    const liveTask = tasks.find((t) => t.id === prompt.taskId);
+    if (liveTask) {
+      return { ...prompt, status: liveTask.status };
+    }
+    return prompt;
+  });
 
   // Fetch agent log every 3 seconds
   const fetchLog = useCallback(async () => {
@@ -84,6 +119,9 @@ export default function LivePromptPage() {
     }
   }, [logLines]);
 
+  // Selected task info for display
+  const selectedTaskInfo = tasks.find((t) => t.id === selectedTask);
+
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       {/* Header */}
@@ -100,25 +138,32 @@ export default function LivePromptPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Left: Prompt accordion */}
         <div className="space-y-3">
-          <h2 className="text-sm font-mono font-semibold text-slate-400 uppercase tracking-wider">
-            Prompts
-          </h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-mono font-semibold text-slate-400 uppercase tracking-wider">
+              Prompts
+            </h2>
+            <span className="text-[10px] font-mono text-slate-600">
+              {enrichedPrompts.length} prompt{enrichedPrompts.length !== 1 ? "s" : ""}
+            </span>
+          </div>
 
           {loading ? (
             <div className="text-center text-slate-600 text-xs font-mono py-12 animate-pulse">
               Loading prompts...
             </div>
-          ) : prompts.length === 0 ? (
+          ) : enrichedPrompts.length === 0 ? (
             <div className="text-center text-slate-600 text-xs font-mono py-12 rounded-xl border border-slate-700 bg-slate-900/50">
               No prompt files found.
             </div>
           ) : (
             <div className="space-y-2">
-              {prompts.map((prompt, i) => {
+              {enrichedPrompts.map((prompt, i) => {
                 const isExpanded = expandedPrompt === prompt.filename;
                 const lines = prompt.content.split("\n");
-                const charCount = prompt.content.length;
                 const lineCount = lines.length;
+                const words = wordCount(prompt.content);
+                const tokens = estimateTokens(prompt.content);
+                const sColor = statusColor(prompt.status);
 
                 return (
                   <motion.div
@@ -127,31 +172,48 @@ export default function LivePromptPage() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: i * 0.05 }}
                     className="bg-slate-900/50 border border-slate-700 rounded-xl overflow-hidden"
+                    style={{ borderLeftWidth: 3, borderLeftColor: sColor }}
                   >
                     <button
                       onClick={() => setExpandedPrompt(isExpanded ? null : prompt.filename)}
                       className="w-full text-left px-4 py-3 hover:bg-slate-800/30 transition-colors"
                     >
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
                           <span className="text-sm text-purple-500">$</span>
-                          <div>
-                            <div className="font-mono font-semibold text-sm text-white">
+                          <div className="min-w-0">
+                            <div className="font-mono font-semibold text-sm text-white truncate">
                               {prompt.name}
                             </div>
-                            <div className="flex items-center gap-3 mt-1">
+                            <div className="flex items-center gap-2 mt-1 flex-wrap">
                               <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-400/10 text-cyan-400 border border-cyan-400/20">
                                 {prompt.agent}
                               </span>
+                              <span
+                                className="text-[10px] font-mono px-2 py-0.5 rounded border font-semibold"
+                                style={{
+                                  color: sColor,
+                                  borderColor: `${sColor}44`,
+                                  backgroundColor: `${sColor}18`,
+                                }}
+                              >
+                                {statusLabel(prompt.status).toUpperCase()}
+                              </span>
                               <span className="text-[10px] font-mono text-slate-600">
-                                {charCount} chars | {lineCount} lines
+                                {words} words
+                              </span>
+                              <span className="text-[10px] font-mono text-slate-600" title="Estimated GPT tokens">
+                                ~{tokens.toLocaleString()} tokens
+                              </span>
+                              <span className="text-[10px] font-mono text-slate-600">
+                                {lineCount} lines
                               </span>
                             </div>
                           </div>
                         </div>
                         <motion.span
                           animate={{ rotate: isExpanded ? 180 : 0 }}
-                          className="text-slate-500 text-xs"
+                          className="text-slate-500 text-xs shrink-0 ml-2"
                         >
                           ▼
                         </motion.span>
@@ -205,37 +267,84 @@ export default function LivePromptPage() {
             <h2 className="text-sm font-mono font-semibold text-slate-400 uppercase tracking-wider">
               Agent Log
             </h2>
-            {logLoading && (
-              <span className="text-[10px] font-mono text-slate-600 animate-pulse">refreshing...</span>
-            )}
+            <div className="flex items-center gap-3">
+              {selectedTaskInfo && (
+                <span
+                  className="text-[10px] font-mono px-2 py-0.5 rounded border font-semibold"
+                  style={{
+                    color: statusColor(selectedTaskInfo.status),
+                    borderColor: `${statusColor(selectedTaskInfo.status)}44`,
+                    backgroundColor: `${statusColor(selectedTaskInfo.status)}18`,
+                  }}
+                >
+                  {selectedTaskInfo.status.toUpperCase()}
+                </span>
+              )}
+              {logLoading && (
+                <span className="text-[10px] font-mono text-slate-600 animate-pulse">refreshing...</span>
+              )}
+            </div>
           </div>
 
-          {/* Task selector */}
-          {activeTasks.length > 0 ? (
+          {/* Task selector — shows ALL tasks, grouped by status */}
+          {tasks.length > 0 && (
             <select
               value={selectedTask}
               onChange={(e) => setSelectedTask(e.target.value)}
               className="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2 text-xs font-mono text-slate-300 focus:outline-none focus:border-cyan-400/50"
             >
-              {activeTasks.map((task) => (
-                <option key={task.id} value={task.id}>
-                  {task.name || task.id} — {task.agent} ({task.status})
-                </option>
-              ))}
+              {/* Running tasks first */}
+              {tasks.filter((t) => t.status === "running").length > 0 && (
+                <optgroup label="Running">
+                  {tasks.filter((t) => t.status === "running").map((task) => (
+                    <option key={task.id} value={task.id}>
+                      {task.name || task.id} — {task.agent}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              {/* Pending */}
+              {tasks.filter((t) => t.status === "pending" || t.status === "ci_pending").length > 0 && (
+                <optgroup label="Pending">
+                  {tasks.filter((t) => t.status === "pending" || t.status === "ci_pending").map((task) => (
+                    <option key={task.id} value={task.id}>
+                      {task.name || task.id} — {task.agent}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              {/* Completed */}
+              {tasks.filter((t) => ["completed", "done", "ready_for_review"].includes(t.status)).length > 0 && (
+                <optgroup label="Completed">
+                  {tasks.filter((t) => ["completed", "done", "ready_for_review"].includes(t.status)).map((task) => (
+                    <option key={task.id} value={task.id}>
+                      {task.name || task.id} — {task.agent}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              {/* Failed / Dead */}
+              {tasks.filter((t) => ["failed", "ci_failed", "dead"].includes(t.status)).length > 0 && (
+                <optgroup label="Failed / Dead">
+                  {tasks.filter((t) => ["failed", "ci_failed", "dead"].includes(t.status)).map((task) => (
+                    <option key={task.id} value={task.id}>
+                      {task.name || task.id} — {task.agent}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              {/* Other statuses */}
+              {tasks.filter((t) => !["running", "pending", "ci_pending", "completed", "done", "ready_for_review", "failed", "ci_failed", "dead"].includes(t.status)).length > 0 && (
+                <optgroup label="Other">
+                  {tasks.filter((t) => !["running", "pending", "ci_pending", "completed", "done", "ready_for_review", "failed", "ci_failed", "dead"].includes(t.status)).map((task) => (
+                    <option key={task.id} value={task.id}>
+                      {task.name || task.id} — {task.agent} ({task.status})
+                    </option>
+                  ))}
+                </optgroup>
+              )}
             </select>
-          ) : tasks.length > 0 ? (
-            <select
-              value={selectedTask}
-              onChange={(e) => setSelectedTask(e.target.value)}
-              className="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2 text-xs font-mono text-slate-300 focus:outline-none focus:border-cyan-400/50"
-            >
-              {tasks.map((task) => (
-                <option key={task.id} value={task.id}>
-                  {task.name || task.id} — {task.agent} ({task.status})
-                </option>
-              ))}
-            </select>
-          ) : null}
+          )}
 
           {/* Terminal log display */}
           <div
@@ -253,6 +362,12 @@ export default function LivePromptPage() {
               </div>
             ) : (
               <div className="p-4 space-y-0">
+                {/* Header line showing selected task */}
+                {selectedTaskInfo && (
+                  <div className="text-slate-600 mb-2 pb-2 border-b border-slate-800/50">
+                    # Log: {selectedTaskInfo.name || selectedTaskInfo.id} ({selectedTaskInfo.agent})
+                  </div>
+                )}
                 {logLines.map((line, i) => {
                   // Color code based on content
                   let textClass = "text-emerald-400/80";
