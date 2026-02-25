@@ -37,11 +37,11 @@ export default function Navbar() {
   }, []);
 
   return (
-    <nav className="sticky top-0 z-50 backdrop-blur-md bg-slate-950/80 border-b border-slate-800/50">
+    <nav aria-label="Main navigation" className="sticky top-0 z-50 backdrop-blur-md bg-slate-950/80 border-b border-slate-800/50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center h-12 gap-1">
           {/* Logo */}
-          <Link href="/live" className="shrink-0 mr-4 flex items-center gap-2">
+          <Link href="/live" className="shrink-0 mr-4 flex items-center gap-2" aria-label="Agent Swarm Monitor — home">
             <span className="text-cyan-400 font-mono font-bold text-sm">ASM</span>
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
@@ -60,6 +60,7 @@ export default function Navbar() {
                 <Link
                   key={item.href}
                   href={item.href}
+                  aria-current={isActive ? "page" : undefined}
                   className={`relative shrink-0 px-3 py-1.5 rounded-md text-xs font-mono transition-colors ${
                     isActive
                       ? "text-white"
@@ -132,6 +133,7 @@ export default function Navbar() {
                   <Link
                     key={item.href}
                     href={item.href}
+                    aria-current={isActive ? "page" : undefined}
                     className={`block px-3 py-2 rounded-md text-sm font-mono transition-colors ${
                       isActive
                         ? "text-white bg-cyan-400/15 border border-cyan-400/30"

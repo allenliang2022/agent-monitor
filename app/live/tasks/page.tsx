@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLive } from "../LiveContext";
 import type { AgentTask } from "../LiveContext";
@@ -295,6 +295,7 @@ function SpawnTaskModal({ open, onClose }: SpawnModalProps) {
               <button
                 onClick={handleClose}
                 className="text-slate-500 hover:text-slate-300 transition-colors text-lg font-mono leading-none"
+                aria-label="Close spawn task modal"
               >
                 x
               </button>
@@ -428,6 +429,22 @@ export default function TasksPage() {
   const dataReady = useMinimumLoading(!initialLoading);
   const [spawnOpen, setSpawnOpen] = useState(false);
 
+  // Listen for keyboard shortcut to open new task modal
+  useEffect(() => {
+    function handleNewTask() {
+      setSpawnOpen(true);
+    }
+    function handleCloseModal() {
+      setSpawnOpen(false);
+    }
+    window.addEventListener("keyboard:new-task", handleNewTask);
+    window.addEventListener("keyboard:close-modal", handleCloseModal);
+    return () => {
+      window.removeEventListener("keyboard:new-task", handleNewTask);
+      window.removeEventListener("keyboard:close-modal", handleCloseModal);
+    };
+  }, []);
+
   const running = tasks.filter((t) => t.status === "running");
   const pending = tasks.filter((t) => t.status === "pending");
   const history = tasks.filter(
@@ -494,6 +511,7 @@ export default function TasksPage() {
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.97 }}
           onClick={() => setSpawnOpen(true)}
+          aria-label="Spawn new task"
           className="ml-auto px-3 py-1.5 text-xs font-mono font-semibold rounded-lg bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-500/25 hover:border-cyan-500/50 transition-all flex items-center gap-2"
         >
           <span className="text-base leading-none">+</span> New Task

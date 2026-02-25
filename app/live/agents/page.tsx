@@ -337,7 +337,7 @@ function IconButton({
 
   if (href && !disabled) {
     return (
-      <Link href={href} className={className}>
+      <Link href={href} className={className} aria-label={label}>
         {tooltip}
         {children}
       </Link>
@@ -345,7 +345,7 @@ function IconButton({
   }
 
   return (
-    <button onClick={onClick} disabled={disabled} className={className}>
+    <button onClick={onClick} disabled={disabled} className={className} aria-label={label}>
       {tooltip}
       {children}
     </button>
