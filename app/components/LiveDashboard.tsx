@@ -50,6 +50,21 @@ interface SSEUpdate {
   message?: string;
 }
 
+interface TimelineEvent {
+  id: number;
+  timestamp: string;
+  type: "session_start" | "session_update" | "session_end" | "git_change";
+  actor: string;
+  detail: string;
+}
+
+interface ConfigData {
+  agents: { name: string; hasCron: boolean; sessionCount: number }[];
+  cron: { count: number; jobs: { name: string; schedule: string }[] };
+  skills: { count: number; skills: string[] };
+  channels: string[];
+}
+
 // ─── Agent color map ────────────────────────────────────────────────────────
 
 const agentColor: Record<string, string> = {
@@ -82,6 +97,16 @@ export default function LiveDashboard() {
   const [expandedSession, setExpandedSession] = useState<string | null>(null);
   const logEndRef = useRef<HTMLDivElement>(null);
   const eventIdRef = useRef(0);
+
+  // ── New state for 4 additional sections ───────────────────────────────
+  const [sseEventsCount, setSseEventsCount] = useState(0);
+  const [connectionTime] = useState(() => Date.now());
+  const [uptime, setUptime] = useState("0s");
+  const [timelineEvents, setTimelineEvents] = useState<TimelineEvent[]>([]);
+  const timelineIdRef = useRef(0);
+  const prevSessionKeysRef = useRef<Set<string>>(new Set());
+  const [configData, setConfigData] = useState<ConfigData | null>(null);
+  const [expandedConfigSection, setExpandedConfigSection] = useState<string | null>("agents");
 
   // ── Add event to log ─────────────────────────────────────────────────────
 
@@ -146,6 +171,9 @@ export default function LiveDashboard() {
           const data: SSEUpdate = JSON.parse(event.data);
 
           if (data.type === "update") {
+            // Increment SSE events counter
+            setSseEventsCount((prev) => prev + 1);
+
             // Update sessions
             const rawSessions = data.sessions;
             let sessionsList: Session[] = [];
@@ -155,6 +183,71 @@ export default function LiveDashboard() {
               sessionsList = rawSessions.sessions;
             }
             setSessions(sessionsList);
+
+            // Track timeline events from session changes
+            const currentKeys = new Set(sessionsList.map((s) => s.key ?? s.sessionId ?? "unknown"));
+            const prevKeys = prevSessionKeysRef.current;
+
+            // Detect new sessions
+            currentKeys.forEach((key) => {
+              if (!prevKeys.has(key)) {
+                const session = sessionsList.find((s) => (s.key ?? s.sessionId) === key);
+                setTimelineEvents((prev) =>
+                  [
+                    {
+                      id: timelineIdRef.current++,
+                      timestamp: new Date().toISOString(),
+                      type: "session_start" as const,
+                      actor: session?.agentId ?? "unknown",
+                      detail: `Session started: ${key.replace(/^agent:\w+:/, "")}`,
+                    },
+                    ...prev,
+                  ].slice(0, 50)
+                );
+              }
+            });
+
+            // Detect ended sessions
+            prevKeys.forEach((key) => {
+              if (!currentKeys.has(key)) {
+                setTimelineEvents((prev) =>
+                  [
+                    {
+                      id: timelineIdRef.current++,
+                      timestamp: new Date().toISOString(),
+                      type: "session_end" as const,
+                      actor: "system",
+                      detail: `Session ended: ${key.replace(/^agent:\w+:/, "")}`,
+                    },
+                    ...prev,
+                  ].slice(0, 50)
+                );
+              }
+            });
+
+            // If sessions exist but no new/ended, log an update periodically
+            if (currentKeys.size > 0 && currentKeys.size === prevKeys.size) {
+              // Only add an update event every 6th SSE message to avoid flooding
+              setSseEventsCount((cnt) => {
+                if (cnt % 6 === 0) {
+                  setTimelineEvents((prev) =>
+                    [
+                      {
+                        id: timelineIdRef.current++,
+                        timestamp: new Date().toISOString(),
+                        type: "session_update" as const,
+                        actor: sessionsList[0]?.agentId ?? "system",
+                        detail: `${sessionsList.length} session(s) active`,
+                      },
+                      ...prev,
+                    ].slice(0, 50)
+                  );
+                }
+                return cnt;
+              });
+            }
+
+            prevSessionKeysRef.current = currentKeys;
 
             // Update health
             if (data.health) {
@@ -196,6 +289,39 @@ export default function LiveDashboard() {
   useEffect(() => {
     logEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [eventLog]);
+
+  // ── Uptime ticker ────────────────────────────────────────────────────
+  useEffect(() => {
+    const tick = () => {
+      const elapsed = Math.floor((Date.now() - connectionTime) / 1000);
+      if (elapsed < 60) setUptime(`${elapsed}s`);
+      else if (elapsed < 3600) setUptime(`${Math.floor(elapsed / 60)}m ${elapsed % 60}s`);
+      else {
+        const h = Math.floor(elapsed / 3600);
+        const m = Math.floor((elapsed % 3600) / 60);
+        setUptime(`${h}h ${m}m`);
+      }
+    };
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [connectionTime]);
+
+  // ── Fetch config ─────────────────────────────────────────────────────
+  useEffect(() => {
+    const fetchConfig = async () => {
+      try {
+        const res = await fetch("/api/config");
+        const data: ConfigData = await res.json();
+        setConfigData(data);
+      } catch {
+        // silently retry next interval
+      }
+    };
+    fetchConfig();
+    const interval = setInterval(fetchConfig, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   // ── Add git dir ──────────────────────────────────────────────────────────
 
@@ -519,6 +645,530 @@ export default function LiveDashboard() {
           </AnimatePresence>
           <div ref={logEndRef} />
         </div>
+      </motion.section>
+
+      {/* ════════════════════════════════════════════════════════════════════
+          NEW SECTIONS BELOW — Live Overview, Timeline, Agent Status, Config
+          ════════════════════════════════════════════════════════════════════ */}
+
+      {/* ── 5. Live Overview (Mission Control) ─────────────────────────── */}
+      <motion.section
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.4 }}
+      >
+        <div className="flex items-center gap-3 mb-3">
+          <h2 className="text-sm font-mono text-cyan-400 flex items-center gap-2">
+            <span className="text-cyan-400/50">&gt;</span> Live Overview
+          </h2>
+          <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-[10px] font-mono text-cyan-400">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-400" />
+            </span>
+            MISSION CONTROL
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {/* Active Sessions */}
+          <motion.div
+            className="bg-slate-900/40 border border-cyan-500/20 rounded-lg p-4 text-center"
+            whileHover={{ scale: 1.02 }}
+          >
+            <div className="text-[10px] font-mono text-slate-500 mb-1">ACTIVE SESSIONS</div>
+            <motion.div
+              key={sessions.length}
+              initial={{ scale: 1.3, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="text-2xl font-mono font-bold text-cyan-400"
+            >
+              {sessions.length}
+            </motion.div>
+          </motion.div>
+
+          {/* Active Agents */}
+          <motion.div
+            className="bg-slate-900/40 border border-purple-500/20 rounded-lg p-4 text-center"
+            whileHover={{ scale: 1.02 }}
+          >
+            <div className="text-[10px] font-mono text-slate-500 mb-1">ACTIVE AGENTS</div>
+            <motion.div
+              key={new Set(sessions.map((s) => s.agentId).filter(Boolean)).size}
+              initial={{ scale: 1.3, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="text-2xl font-mono font-bold text-purple-400"
+            >
+              {new Set(sessions.map((s) => s.agentId).filter(Boolean)).size}
+            </motion.div>
+          </motion.div>
+
+          {/* Uptime */}
+          <motion.div
+            className="bg-slate-900/40 border border-green-500/20 rounded-lg p-4 text-center"
+            whileHover={{ scale: 1.02 }}
+          >
+            <div className="text-[10px] font-mono text-slate-500 mb-1">UPTIME</div>
+            <div className="text-2xl font-mono font-bold text-green-400">
+              {uptime}
+            </div>
+          </motion.div>
+
+          {/* Events Received */}
+          <motion.div
+            className="bg-slate-900/40 border border-amber-500/20 rounded-lg p-4 text-center"
+            whileHover={{ scale: 1.02 }}
+          >
+            <div className="text-[10px] font-mono text-slate-500 mb-1">EVENTS RECEIVED</div>
+            <motion.div
+              key={sseEventsCount}
+              initial={{ scale: 1.3, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="text-2xl font-mono font-bold text-amber-400"
+            >
+              {sseEventsCount}
+            </motion.div>
+          </motion.div>
+        </div>
+      </motion.section>
+
+      {/* ── 6. Live Session Timeline ───────────────────────────────────── */}
+      <motion.section
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.5 }}
+      >
+        <h2 className="text-sm font-mono text-cyan-400 mb-3 flex items-center gap-2">
+          <span className="text-cyan-400/50">&gt;</span> Live Timeline
+        </h2>
+        <div className="bg-slate-900/40 border border-slate-800/50 rounded-lg p-4 max-h-80 overflow-y-auto">
+          {timelineEvents.length === 0 ? (
+            <p className="text-slate-600 text-xs font-mono text-center py-4">
+              No timeline events yet. Waiting for session changes...
+            </p>
+          ) : (
+            <div className="relative">
+              {/* Vertical line */}
+              <div className="absolute left-3 top-0 bottom-0 w-px bg-slate-700/50" />
+              <AnimatePresence>
+                {timelineEvents.map((evt) => {
+                  const dotColor =
+                    evt.type === "session_start"
+                      ? "bg-cyan-400 shadow-[0_0_6px_rgba(34,211,238,0.5)]"
+                      : evt.type === "session_end"
+                      ? "bg-red-400 shadow-[0_0_6px_rgba(248,113,113,0.5)]"
+                      : evt.type === "git_change"
+                      ? "bg-purple-400 shadow-[0_0_6px_rgba(192,132,252,0.5)]"
+                      : "bg-green-400 shadow-[0_0_6px_rgba(74,222,128,0.5)]";
+
+                  const actorColor =
+                    evt.actor === "main"
+                      ? "text-cyan-400"
+                      : evt.actor === "girlfriend"
+                      ? "text-pink-400"
+                      : evt.actor === "xiaolongnv"
+                      ? "text-purple-400"
+                      : "text-slate-400";
+
+                  return (
+                    <motion.div
+                      key={evt.id}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: 20 }}
+                      className="relative flex items-start gap-3 pl-7 pb-3"
+                    >
+                      <div
+                        className={`absolute left-2 top-1.5 w-2.5 h-2.5 rounded-full ${dotColor}`}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-mono text-slate-600">
+                            {new Date(evt.timestamp).toLocaleTimeString()}
+                          </span>
+                          <span
+                            className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${
+                              evt.type === "session_start"
+                                ? "bg-cyan-500/10 text-cyan-400 border-cyan-500/20"
+                                : evt.type === "session_end"
+                                ? "bg-red-500/10 text-red-400 border-red-500/20"
+                                : evt.type === "git_change"
+                                ? "bg-purple-500/10 text-purple-400 border-purple-500/20"
+                                : "bg-green-500/10 text-green-400 border-green-500/20"
+                            }`}
+                          >
+                            {evt.type.replace("_", " ")}
+                          </span>
+                          <span className={`text-[10px] font-mono font-semibold ${actorColor}`}>
+                            {evt.actor}
+                          </span>
+                        </div>
+                        <p className="text-xs font-mono text-slate-400 mt-0.5 truncate">
+                          {evt.detail}
+                        </p>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </AnimatePresence>
+            </div>
+          )}
+        </div>
+      </motion.section>
+
+      {/* ── 7. Live Agent Status Monitor ───────────────────────────────── */}
+      <motion.section
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.6 }}
+      >
+        <h2 className="text-sm font-mono text-purple-400 mb-3 flex items-center gap-2">
+          <span className="text-purple-400/50">&gt;</span> Live Agent Status
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {(["main", "girlfriend", "xiaolongnv"] as const).map((agentName) => {
+            const agentSessions = sessions.filter(
+              (s) => s.agentId?.toLowerCase() === agentName
+            );
+            const isActive = agentSessions.some(
+              (s) => (s.ageMs ?? 999999) < 300000
+            );
+            const lastActivity = agentSessions.length > 0
+              ? agentSessions.reduce((latest, s) =>
+                  (s.updatedAt ?? 0) > (latest.updatedAt ?? 0) ? s : latest
+                )
+              : null;
+
+            const borderColor =
+              agentName === "main"
+                ? "border-cyan-500/30"
+                : agentName === "girlfriend"
+                ? "border-pink-500/30"
+                : "border-purple-500/30";
+
+            const nameColor =
+              agentName === "main"
+                ? "text-cyan-400"
+                : agentName === "girlfriend"
+                ? "text-pink-400"
+                : "text-purple-400";
+
+            const glowColor =
+              agentName === "main"
+                ? "shadow-[0_0_15px_rgba(34,211,238,0.15)]"
+                : agentName === "girlfriend"
+                ? "shadow-[0_0_15px_rgba(244,114,182,0.15)]"
+                : "shadow-[0_0_15px_rgba(192,132,252,0.15)]";
+
+            return (
+              <motion.div
+                key={agentName}
+                className={`bg-slate-900/40 border ${borderColor} rounded-lg p-4 ${
+                  isActive ? glowColor : ""
+                }`}
+                whileHover={{ scale: 1.02 }}
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    {isActive && (
+                      <span className="relative flex h-2 w-2">
+                        <span
+                          className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                            agentName === "main"
+                              ? "bg-cyan-400"
+                              : agentName === "girlfriend"
+                              ? "bg-pink-400"
+                              : "bg-purple-400"
+                          }`}
+                        />
+                        <span
+                          className={`relative inline-flex rounded-full h-2 w-2 ${
+                            agentName === "main"
+                              ? "bg-cyan-400"
+                              : agentName === "girlfriend"
+                              ? "bg-pink-400"
+                              : "bg-purple-400"
+                          }`}
+                        />
+                      </span>
+                    )}
+                    <span className={`font-mono font-semibold text-sm ${nameColor}`}>
+                      {agentName}
+                    </span>
+                  </div>
+                  <span
+                    className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
+                      isActive
+                        ? "bg-green-500/10 text-green-400 border-green-500/20"
+                        : "bg-slate-500/10 text-slate-500 border-slate-500/20"
+                    }`}
+                  >
+                    {isActive ? "ACTIVE" : "IDLE"}
+                  </span>
+                </div>
+
+                <div className="space-y-2 text-xs font-mono">
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Sessions</span>
+                    <span className="text-slate-300">{agentSessions.length}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Channel</span>
+                    <span className="text-slate-400 truncate max-w-[120px]">
+                      {agentSessions[0]?.channel ?? "—"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Last Activity</span>
+                    <span className="text-slate-400">
+                      {lastActivity?.updatedAt
+                        ? new Date(lastActivity.updatedAt).toLocaleTimeString()
+                        : "—"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Age</span>
+                    <span className="text-slate-400">
+                      {agentSessions[0]?.age ?? "—"}
+                    </span>
+                  </div>
+                </div>
+              </motion.div>
+            );
+          })}
+        </div>
+      </motion.section>
+
+      {/* ── 8. Live Config Display ─────────────────────────────────────── */}
+      <motion.section
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.7 }}
+      >
+        <h2 className="text-sm font-mono text-amber-400 mb-3 flex items-center gap-2">
+          <span className="text-amber-400/50">&gt;</span> System Config
+        </h2>
+
+        {!configData ? (
+          <div className="bg-slate-900/40 border border-slate-800/50 rounded-lg p-6 text-center text-slate-600 text-xs font-mono animate-pulse">
+            Loading configuration...
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {/* Agents Config */}
+            <div className="bg-slate-900/40 border border-slate-800/50 rounded-lg overflow-hidden">
+              <button
+                onClick={() =>
+                  setExpandedConfigSection(
+                    expandedConfigSection === "agents" ? null : "agents"
+                  )
+                }
+                className="w-full flex items-center justify-between px-4 py-3 text-xs font-mono text-slate-300 hover:bg-slate-800/30 transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-cyan-400">&#9654;</span>
+                  <span>Agents Config</span>
+                  <span className="text-slate-600">({configData.agents.length})</span>
+                </div>
+                <span className="text-slate-600">
+                  {expandedConfigSection === "agents" ? "▲" : "▼"}
+                </span>
+              </button>
+              <AnimatePresence>
+                {expandedConfigSection === "agents" && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="px-4 pb-3 space-y-2">
+                      {configData.agents.map((agent) => (
+                        <div
+                          key={agent.name}
+                          className="flex items-center justify-between text-[11px] font-mono py-1 border-t border-slate-800/30"
+                        >
+                          <span
+                            className={
+                              agent.name === "main"
+                                ? "text-cyan-400"
+                                : agent.name === "girlfriend"
+                                ? "text-pink-400"
+                                : agent.name === "xiaolongnv"
+                                ? "text-purple-400"
+                                : "text-slate-300"
+                            }
+                          >
+                            {agent.name}
+                          </span>
+                          <div className="flex items-center gap-3">
+                            <span className="text-slate-500">
+                              {agent.sessionCount} sessions
+                            </span>
+                            {agent.hasCron && (
+                              <span className="text-amber-400/60 text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20">
+                                cron
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Active Cron Jobs */}
+            <div className="bg-slate-900/40 border border-slate-800/50 rounded-lg overflow-hidden">
+              <button
+                onClick={() =>
+                  setExpandedConfigSection(
+                    expandedConfigSection === "cron" ? null : "cron"
+                  )
+                }
+                className="w-full flex items-center justify-between px-4 py-3 text-xs font-mono text-slate-300 hover:bg-slate-800/30 transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-amber-400">&#9654;</span>
+                  <span>Active Cron Jobs</span>
+                  <span className="text-slate-600">({configData.cron.count})</span>
+                </div>
+                <span className="text-slate-600">
+                  {expandedConfigSection === "cron" ? "▲" : "▼"}
+                </span>
+              </button>
+              <AnimatePresence>
+                {expandedConfigSection === "cron" && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="px-4 pb-3 space-y-1">
+                      {configData.cron.jobs.length === 0 ? (
+                        <p className="text-slate-600 text-[11px] font-mono py-1">
+                          No cron jobs configured.
+                        </p>
+                      ) : (
+                        configData.cron.jobs.map((job, i) => (
+                          <div
+                            key={i}
+                            className="flex items-center justify-between text-[11px] font-mono py-1 border-t border-slate-800/30"
+                          >
+                            <span className="text-slate-300">{job.name}</span>
+                            <span className="text-amber-400/70">{job.schedule}</span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Installed Skills */}
+            <div className="bg-slate-900/40 border border-slate-800/50 rounded-lg overflow-hidden">
+              <button
+                onClick={() =>
+                  setExpandedConfigSection(
+                    expandedConfigSection === "skills" ? null : "skills"
+                  )
+                }
+                className="w-full flex items-center justify-between px-4 py-3 text-xs font-mono text-slate-300 hover:bg-slate-800/30 transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-green-400">&#9654;</span>
+                  <span>Installed Skills</span>
+                  <span className="text-slate-600">({configData.skills.count})</span>
+                </div>
+                <span className="text-slate-600">
+                  {expandedConfigSection === "skills" ? "▲" : "▼"}
+                </span>
+              </button>
+              <AnimatePresence>
+                {expandedConfigSection === "skills" && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="px-4 pb-3">
+                      {configData.skills.skills.length === 0 ? (
+                        <p className="text-slate-600 text-[11px] font-mono py-1">
+                          No skills installed.
+                        </p>
+                      ) : (
+                        <div className="flex flex-wrap gap-2 pt-1">
+                          {configData.skills.skills.map((skill) => (
+                            <span
+                              key={skill}
+                              className="text-[10px] font-mono px-2 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-500/20"
+                            >
+                              {skill}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Channel Bindings */}
+            <div className="bg-slate-900/40 border border-slate-800/50 rounded-lg overflow-hidden">
+              <button
+                onClick={() =>
+                  setExpandedConfigSection(
+                    expandedConfigSection === "channels" ? null : "channels"
+                  )
+                }
+                className="w-full flex items-center justify-between px-4 py-3 text-xs font-mono text-slate-300 hover:bg-slate-800/30 transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-purple-400">&#9654;</span>
+                  <span>Channel Bindings</span>
+                  <span className="text-slate-600">({configData.channels.length})</span>
+                </div>
+                <span className="text-slate-600">
+                  {expandedConfigSection === "channels" ? "▲" : "▼"}
+                </span>
+              </button>
+              <AnimatePresence>
+                {expandedConfigSection === "channels" && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="px-4 pb-3">
+                      {configData.channels.length === 0 ? (
+                        <p className="text-slate-600 text-[11px] font-mono py-1">
+                          No channels detected.
+                        </p>
+                      ) : (
+                        <div className="flex flex-wrap gap-2 pt-1">
+                          {configData.channels.map((ch) => (
+                            <span
+                              key={ch}
+                              className="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20"
+                            >
+                              {ch}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </div>
+        )}
       </motion.section>
     </div>
   );
