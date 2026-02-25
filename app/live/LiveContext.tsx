@@ -51,9 +51,19 @@ export interface FileChangesResult {
 
 export interface GitCommit {
   hash: string;
+  parents?: string[];
   message: string;
   author?: string;
   time?: string;
+  refs?: string[];
+}
+
+export interface GitBranch {
+  name: string;
+  commit: string;
+  tracking: string;
+  isHead: boolean;
+  merged: boolean;
 }
 
 export interface GitInfo {
@@ -63,6 +73,8 @@ export interface GitInfo {
   changedFiles: number;
   status: string;
   recentCommits: GitCommit[];
+  branches?: GitBranch[];
+  mainBranch?: string;
   diffStat: string;
   error?: string;
 }
