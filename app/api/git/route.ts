@@ -24,15 +24,45 @@ export async function GET(request: NextRequest) {
   try {
     const branch = execGit("git rev-parse --abbrev-ref HEAD", dir);
     const status = execGit("git status --short", dir);
+    // Include decoration (branch/tag refs) and parent hashes for graph rendering
     const log = execGit(
-      'git log --format="%H|%s|%an|%ar" -10',
+      'git log --all --format="%H|%P|%s|%an|%ar|%D" -20',
       dir
     );
     const diffStat = execGit("git diff --stat", dir);
 
+    // List all branches with their latest commit and merge status
+    const branchList = execGit(
+      'git branch -a --format="%(refname:short)|%(objectname:short)|%(upstream:track)"',
+      dir
+    );
+
     const changedFiles = status
       .split("\n")
       .filter((line) => line.trim().length > 0);
+
+    // Parse branches
+    const branches = branchList
+      .split("\n")
+      .filter((l) => l.trim())
+      .map((line) => {
+        const parts = line.split("|");
+        const name = parts[0] || "";
+        return {
+          name,
+          commit: parts[1] || "",
+          tracking: parts[2] || "",
+          isHead: name === branch,
+        };
+      })
+      .filter((b) => !b.name.startsWith("origin/"));
+
+    // Check which branches are merged into main/master
+    const mainBranch = branches.find((b) => b.name === "main" || b.name === "master")?.name || branch;
+    const mergedBranches = execGit(`git branch --merged ${mainBranch}`, dir)
+      .split("\n")
+      .map((l) => l.trim().replace(/^\*\s*/, ""))
+      .filter((l) => l.length > 0);
 
     return Response.json({
       directory: dir,
@@ -45,13 +75,21 @@ export async function GET(request: NextRequest) {
         .filter((l) => l.trim())
         .map((line) => {
           const parts = line.split("|");
+          const refs = (parts[5] || "").split(",").map((r) => r.trim()).filter(Boolean);
           return {
             hash: parts[0] || "",
-            message: parts[1] || "",
-            author: parts[2] || "",
-            time: parts[3] || "",
+            parents: (parts[1] || "").split(" ").filter(Boolean),
+            message: parts[2] || "",
+            author: parts[3] || "",
+            time: parts[4] || "",
+            refs,
           };
         }),
+      branches: branches.map((b) => ({
+        ...b,
+        merged: mergedBranches.includes(b.name),
+      })),
+      mainBranch,
       diffStat: diffStat || "(no changes)",
     });
   } catch (error: unknown) {
