@@ -1,0 +1,431 @@
+[0m
+> build · claude-opus-4.6
+[0m
+[0m• [0mExplore live dashboard codebase[90m Explore Agent[0m
+[0m
+I'll start by exploring the codebase to understand the current state of the live dashboard and its components.
+[0m
+[0m✓ [0mExplore live dashboard codebase[90m Explore Agent[0m
+[0m→ [0mRead app/live/page.tsx
+[0m→ [0mRead app/live/tasks/page.tsx
+[0m→ [0mRead app/live/agent/page.tsx
+[0m→ [0mRead app/live/git/page.tsx
+[0m→ [0mRead app/live/LiveContext.tsx
+[0m→ [0mRead app/live/layout.tsx
+[0m
+Now let me read the actual file contents of all the key files I need to modify:
+[0m
+[0m→ [0mRead app/globals.css
+[0m→ [0mRead app/api/agent-tasks/route.ts
+[0m→ [0mRead app/api/git/route.ts
+[0m→ [0mRead data/agent-tasks.json
+[0m
+Now let me also read the API routes and check the data file:
+[0m
+[0m→ [0mRead package.json
+[0m
+Now I have a thorough understanding of the codebase. Let me plan and execute the tasks.
+[0m
+[0m# [0mTodos
+[ ] Polish /live/page.tsx - Add MISSION CONTROL hero, animated counter cards, SSE data integration
+[ ] Polish /live/tasks/page.tsx - Add task cards with id/agent/status/branch/description, auto-refresh 5s, status badges
+[ ] Polish /live/agent/page.tsx - Terminal-style tmux output, auto-scroll, monospace dark bg
+[ ] Polish /live/git/page.tsx - Mini-timeline commits, time ago, author, branch + dirty files
+[ ] Update LiveContext if needed for new features (pending status, branch field)
+[ ] Update API route for enhanced git data (author, time ago)
+[ ] Run npm run build and fix any errors
+[ ] Commit changes
+[0m
+[0m# [0mTodos
+[ ] Polish /live/page.tsx - Add MISSION CONTROL hero, animated counter cards, SSE data integration
+[ ] Polish /live/tasks/page.tsx - Add task cards with id/agent/status/branch/description, auto-refresh 5s, status badges
+[ ] Polish /live/agent/page.tsx - Terminal-style tmux output, auto-scroll, monospace dark bg
+[ ] Polish /live/git/page.tsx - Mini-timeline commits, time ago, author, branch + dirty files
+[ ] Update LiveContext for new features (pending status, branch field, activeAgents count)
+[ ] Update API route for enhanced git data (author, time ago)
+[ ] Run npm run build and fix any errors
+[ ] Commit changes
+[0m
+Let me start with the foundational changes first - updating the API, LiveContext, and data model, then the pages.
+[0m
+First, let me update the LiveContext to support the `pending` status and add a `branch` field to `AgentTask`, and increase the task polling frequency to 5s:
+[0m
+[0m← [0mEdit app/live/LiveContext.tsx
+Index: /Users/liang/work/agent-monitor-worktrees/live-polish/app/live/LiveContext.tsx
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/live-polish/app/live/LiveContext.tsx
++++ /Users/liang/work/agent-monitor-worktrees/live-polish/app/live/LiveContext.tsx
+@@ -17,11 +17,13 @@
+   name: string;
+   agent: string;
+   model?: string;
+   promptFile?: string;
++  branch?: string;
++  description?: string;
+   startedAt: string;
+   completedAt?: string;
+-  status: "running" | "completed" | "failed";
++  status: "running" | "completed" | "failed" | "pending";
+   commit?: string;
+   filesChanged?: number;
+   summary?: string;
+ }
+
+[0m
+[0m← [0mEdit app/live/LiveContext.tsx
+Index: /Users/liang/work/agent-monitor-worktrees/live-polish/app/live/LiveContext.tsx
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/live-polish/app/live/LiveContext.tsx
++++ /Users/liang/work/agent-monitor-worktrees/live-polish/app/live/LiveContext.tsx
+@@ -27,15 +27,22 @@
+   filesChanged?: number;
+   summary?: string;
+ }
+ 
++export interface GitCommit {
++  hash: string;
++  message: string;
++  author?: string;
++  time?: string;
++}
++
+ export interface GitInfo {
+   directory: string;
+   branch: string;
+   clean: boolean;
+   changedFiles: number;
+   status: string;
+-  recentCommits: { hash: string; message: string }[];
++  recentCommits: GitCommit[];
+   diffStat: string;
+   error?: string;
+ }
+ 
+
+[0m
+Now update the task poll interval from 10s to 5s:
+[0m
+[0m← [0mEdit app/live/LiveContext.tsx
+Index: /Users/liang/work/agent-monitor-worktrees/live-polish/app/live/LiveContext.tsx
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/live-polish/app/live/LiveContext.tsx
++++ /Users/liang/work/agent-monitor-worktrees/live-polish/app/live/LiveContext.tsx
+@@ -152,9 +152,9 @@
+ }, []);
+ 
+ useEffect(() => {
+   fetchTasks();
+-  const interval = setInterval(fetchTasks, 10000);
++  const interval = setInterval(fetchTasks, 5000);
+   return () => clearInterval(interval);
+ }, [fetchTasks]);
+ 
+ // ── Fetch git info ──────────────────────────────────────────────────────
+
+[0m
+[0m# [0mTodos
+[ ] Polish /live/page.tsx - Add MISSION CONTROL hero, animated counter cards, SSE data integration
+[ ] Polish /live/tasks/page.tsx - Add task cards with id/agent/status/branch/description, auto-refresh 5s, status badges
+[ ] Polish /live/agent/page.tsx - Terminal-style tmux output, auto-scroll, monospace dark bg
+[ ] Polish /live/git/page.tsx - Mini-timeline commits, time ago, author, branch + dirty files
+[x] Update LiveContext for new features (pending status, branch field, activeAgents count)
+[ ] Update API route for enhanced git data (author, time ago)
+[ ] Run npm run build and fix any errors
+[ ] Commit changes
+[0m
+Now update the git API to include author and relative time:
+[0m
+[0m← [0mEdit app/api/git/route.ts
+Index: /Users/liang/work/agent-monitor-worktrees/live-polish/app/api/git/route.ts
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/live-polish/app/api/git/route.ts
++++ /Users/liang/work/agent-monitor-worktrees/live-polish/app/api/git/route.ts
+@@ -23,9 +23,12 @@
+ 
+ try {
+   const branch = execGit("git rev-parse --abbrev-ref HEAD", dir);
+   const status = execGit("git status --short", dir);
+-  const log = execGit("git log --oneline -5", dir);
++  const log = execGit(
++    'git log --format="%H|%s|%an|%ar" -10',
++    dir
++  );
+   const diffStat = execGit("git diff --stat", dir);
+ 
+   const changedFiles = status
+     .split("\n")
+@@ -40,12 +43,14 @@
+     recentCommits: log
+       .split("\n")
+       .filter((l) => l.trim())
+       .map((line) => {
+-        const spaceIdx = line.indexOf(" ");
++        const parts = line.split("|");
+         return {
+-          hash: line.substring(0, spaceIdx),
+-          message: line.substring(spaceIdx + 1),
++          hash: parts[0] || "",
++          message: parts[1] || "",
++          author: parts[2] || "",
++          time: parts[3] || "",
+         };
+       }),
+     diffStat: diffStat || "(no changes)",
+   });
+
+[0m
+[0m# [0mTodos
+[ ] Polish /live/page.tsx - Add MISSION CONTROL hero, animated counter cards, SSE data integration
+[ ] Polish /live/tasks/page.tsx - Add task cards with id/agent/status/branch/description, auto-refresh 5s, status badges
+[ ] Polish /live/agent/page.tsx - Terminal-style tmux output, auto-scroll, monospace dark bg
+[ ] Polish /live/git/page.tsx - Mini-timeline commits, time ago, author, branch + dirty files
+[x] Update LiveContext for new features (pending status, branch field, activeAgents count)
+[x] Update API route for enhanced git data (author, time ago)
+[ ] Run npm run build and fix any errors
+[ ] Commit changes
+[0m
+Now let me rewrite the live overview page with the MISSION CONTROL hero section and animated counters:
+[0m
+[0m← [0mWrite app/live/page.tsx
+Wrote file successfully.
+[0m
+[0m# [0mTodos
+[x] Polish /live/page.tsx - Add MISSION CONTROL hero, animated counter cards, SSE data integration
+[ ] Polish /live/tasks/page.tsx - Add task cards with id/agent/status/branch/description, auto-refresh 5s, status badges
+[ ] Polish /live/agent/page.tsx - Terminal-style tmux output, auto-scroll, monospace dark bg
+[ ] Polish /live/git/page.tsx - Mini-timeline commits, time ago, author, branch + dirty files
+[x] Update LiveContext for new features (pending status, branch field, activeAgents count)
+[x] Update API route for enhanced git data (author, time ago)
+[ ] Run npm run build and fix any errors
+[ ] Commit changes
+[0m
+Now rewrite the tasks page with proper task cards, status badges, branch info, and description:
+[0m
+[0m← [0mWrite app/live/tasks/page.tsx
+Wrote file successfully.
+[0m
+[0m# [0mTodos
+[x] Polish /live/page.tsx - Add MISSION CONTROL hero, animated counter cards, SSE data integration
+[x] Polish /live/tasks/page.tsx - Add task cards with id/agent/status/branch/description, auto-refresh 5s, status badges
+[ ] Polish /live/agent/page.tsx - Terminal-style tmux output, auto-scroll, monospace dark bg
+[ ] Polish /live/git/page.tsx - Mini-timeline commits, time ago, author, branch + dirty files
+[x] Update LiveContext for new features (pending status, branch field, activeAgents count)
+[x] Update API route for enhanced git data (author, time ago)
+[ ] Run npm run build and fix any errors
+[ ] Commit changes
+[0m
+Now rewrite the agent page with terminal-style tmux output and auto-scroll:
+[0m
+[0m← [0mWrite app/live/agent/page.tsx
+Wrote file successfully.
+[0m
+[0m# [0mTodos
+[x] Polish /live/page.tsx - Add MISSION CONTROL hero, animated counter cards, SSE data integration
+[x] Polish /live/tasks/page.tsx - Add task cards with id/agent/status/branch/description, auto-refresh 5s, status badges
+[x] Polish /live/agent/page.tsx - Terminal-style tmux output, auto-scroll, monospace dark bg
+[ ] Polish /live/git/page.tsx - Mini-timeline commits, time ago, author, branch + dirty files
+[x] Update LiveContext for new features (pending status, branch field, activeAgents count)
+[x] Update API route for enhanced git data (author, time ago)
+[ ] Run npm run build and fix any errors
+[ ] Commit changes
+[0m
+Now rewrite the git page with a mini-timeline for commits, author info, time ago, and better branch/dirty files display:
+[0m
+[0m← [0mWrite app/live/git/page.tsx
+Wrote file successfully.
+[0m
+[0m# [0mTodos
+[x] Polish /live/page.tsx - Add MISSION CONTROL hero, animated counter cards, SSE data integration
+[x] Polish /live/tasks/page.tsx - Add task cards with id/agent/status/branch/description, auto-refresh 5s, status badges
+[x] Polish /live/agent/page.tsx - Terminal-style tmux output, auto-scroll, monospace dark bg
+[x] Polish /live/git/page.tsx - Mini-timeline commits, time ago, author, branch + dirty files
+[x] Update LiveContext for new features (pending status, branch field, activeAgents count)
+[x] Update API route for enhanced git data (author, time ago)
+[ ] Run npm run build and fix any errors
+[ ] Commit changes
+[0m
+Now let me run the build to check for errors:
+[0m
+[0m$ [0mnpm run build 2>&1
+> agent-monitor@0.1.0 build
+> next build
+
+▲ Next.js 16.1.6 (Turbopack)
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 1699.8ms
+  Running TypeScript ...
+  Collecting page data using 9 workers ...
+  Generating static pages using 9 workers (0/17) ...
+  Generating static pages using 9 workers (4/17) 
+  Generating static pages using 9 workers (8/17) 
+  Generating static pages using 9 workers (12/17) 
+✓ Generating static pages using 9 workers (17/17) in 126.1ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ○ /animations
+├ ƒ /api/agent-tasks
+├ ƒ /api/config
+├ ƒ /api/events
+├ ƒ /api/git
+├ ƒ /api/health
+├ ƒ /api/prompts
+├ ƒ /api/sessions
+├ ○ /architecture
+├ ○ /files
+├ ○ /live
+├ ○ /live/agent
+├ ○ /live/git
+├ ○ /live/prompt
+├ ○ /live/tasks
+├ ○ /monitoring
+├ ○ /prompt
+├ ○ /status
+└ ○ /timeline
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+[0m
+Build passes with zero errors. Now let me commit the changes.
+[0m
+[0m# [0mTodos
+[x] Polish /live/page.tsx - Add MISSION CONTROL hero, animated counter cards, SSE data integration
+[x] Polish /live/tasks/page.tsx - Add task cards with id/agent/status/branch/description, auto-refresh 5s, status badges
+[x] Polish /live/agent/page.tsx - Terminal-style tmux output, auto-scroll, monospace dark bg
+[x] Polish /live/git/page.tsx - Mini-timeline commits, time ago, author, branch + dirty files
+[x] Update LiveContext for new features (pending status, branch field, activeAgents count)
+[x] Update API route for enhanced git data (author, time ago)
+[x] Run npm run build and fix any errors
+[ ] Commit changes
+[0m
+[0m$ [0mgit status
+On branch feat/live-polish
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   app/api/git/route.ts
+	modified:   app/live/LiveContext.tsx
+	modified:   app/live/agent/page.tsx
+	modified:   app/live/git/page.tsx
+	modified:   app/live/page.tsx
+	modified:   app/live/tasks/page.tsx
+
+no changes added to commit (use "git add" and/or "git commit -a")
+[0m
+[0m$ [0mgit diff --stat
+app/api/git/route.ts     |  13 +-
+ app/live/LiveContext.tsx |  15 +-
+ app/live/agent/page.tsx  | 312 ++++++++++++++++++++++++++++------------
+ app/live/git/page.tsx    | 323 +++++++++++++++++++++++++++++------------
+ app/live/page.tsx        | 363 ++++++++++++++++++++++++++++-------------------
+ app/live/tasks/page.tsx  | 336 +++++++++++++++++++++++++++----------------
+ 6 files changed, 912 insertions(+), 450 deletions(-)
+[0m
+[0m$ [0mgit log --oneline -3
+3f375e7 chore: add .clawdbot agent swarm setup
+bf69527 refactor: refocus Live dashboard on coding agent monitoring (remove config/sessions/agents, add tasks/agent)
+e0d9cf9 feat: show actual agent prompts on /live/prompt page
+[0m
+[0m$ [0mgit add -A && git commit -m 'feat: polish live dashboard with mission control UX'
+[feat/live-polish 4c5a891] feat: polish live dashboard with mission control UX
+ Committer: Liang <liang@LiangdeMac-mini.local>
+Your name and email address were configured automatically based
+on your username and hostname. Please check that they are accurate.
+You can suppress this message by setting them explicitly. Run the
+following command and follow the instructions in your editor to edit
+your configuration file:
+
+    git config --global --edit
+
+After doing this, you may fix the identity used for this commit with:
+
+    git commit --amend --reset-author
+
+ 6 files changed, 912 insertions(+), 450 deletions(-)
+[0m
+Now let me try to create a PR:
+[0m
+[0m$ [0mgit remote -v 2>&1
+origin	https://github.com/allenliang2022/agent-monitor.git (fetch)
+origin	https://github.com/allenliang2022/agent-monitor.git (push)
+[0m
+[0m$ [0mgit push -u origin feat/live-polish 2>&1
+remote: 
+remote: Create a pull request for 'feat/live-polish' on GitHub by visiting:        
+remote:      https://github.com/allenliang2022/agent-monitor/pull/new/feat/live-polish        
+remote: 
+To https://github.com/allenliang2022/agent-monitor.git
+ * [new branch]      feat/live-polish -> feat/live-polish
+branch 'feat/live-polish' set up to track 'origin/feat/live-polish'.
+[0m
+[0m$ [0mgh pr create --title "feat: polish live dashboard with mission control UX" --body "$(cat <<'EOF'
+## Summary
+
+- **Overview page**: Added MISSION CONTROL hero section with animated pulse dot, connection status, and scan-line effect. Replaced basic stat cards with 4 animated counter cards (Active Tasks, Active Agents, Total Tasks, Events Received) using framer-motion's `useMotionValue` for smooth number animations.
+- **Tasks page**: Redesigned task list with rich card layout showing id, agent, status badge, branch, description, commit hash, and file count. Status badges use color-coded pills (running=cyan, done=green, failed=red, pending=amber) with animated ping dots for running tasks. Summary bar shows counts per status. Auto-refreshes every 5s via LiveContext.
+- **Agent page**: Added terminal-style tmux output view with macOS-style title bar, auto-scrolling output, blinking cursor, and ANSI-like color parsing. Added agent events feed filtered from SSE stream. Improved agent status card layout.
+- **Git page**: Enhanced with mini-timeline visualization for commits showing hash, message, author, and relative time (e.g., "2 hours ago"). Added branch/dirty status badges in directory header. Improved layout with 3/5 + 2/5 grid for commits vs diff stat.
+- **LiveContext**: Added `pending` status to AgentTask, `branch`/`description` fields, `GitCommit` type with author/time. Increased task poll to 5s.
+- **Git API**: Enhanced `git log` format to include author and relative time.
+
+All pages use shared LiveContext SSE connection, standard Tailwind v4 color classes, and respect `prefers-reduced-motion`. Mobile responsive throughout. Build passes cleanly.
+EOF
+)" 2>&1
+https://github.com/allenliang2022/agent-monitor/pull/2
+[0m
+[0m# [0mTodos
+[x] Polish /live/page.tsx - Add MISSION CONTROL hero, animated counter cards, SSE data integration
+[x] Polish /live/tasks/page.tsx - Add task cards with id/agent/status/branch/description, auto-refresh 5s, status badges
+[x] Polish /live/agent/page.tsx - Terminal-style tmux output, auto-scroll, monospace dark bg
+[x] Polish /live/git/page.tsx - Mini-timeline commits, time ago, author, branch + dirty files
+[x] Update LiveContext for new features (pending status, branch field, activeAgents count)
+[x] Update API route for enhanced git data (author, time ago)
+[x] Run npm run build and fix any errors
+[x] Commit changes
+[0m
+All done. Here's a summary of what was changed across 6 files (+912/-450 lines):
+
+### Changes Made
+
+**`app/live/page.tsx` (Overview)**
+- Added MISSION CONTROL hero section with animated scan-line, grid background, pulse dot, and connection status badge
+- 4 stat cards with `AnimatedCounter` using framer-motion's `useMotionValue` + `animate` for smooth number transitions
+- Cards: Active Tasks, Active Agents, Total Tasks, Events Received
+- Navigation cards with staggered entrance animations and icon prefixes
+
+**`app/live/tasks/page.tsx` (Tasks)**
+- Redesigned as card-based layout with `TaskCard` component
+- Status badges: running=cyan (with ping dot), done=green, failed=red, pending=amber
+- Each card shows: id, agent, status badge, branch, description/summary, commit, files changed, model
+- Summary bar with per-status counts, "auto-refresh 5s" indicator
+- Separate sections for Running, Pending, and Completed tasks
+
+**`app/live/agent/page.tsx` (Agent)**
+- Terminal-style output view with macOS title bar (red/amber/green dots)
+- Auto-scrolling terminal body with blinking cursor
+- ANSI-like color parsing for terminal lines
+- Agent events feed filtered from SSE stream
+- Improved agent status card with grid metadata layout
+
+**`app/live/git/page.tsx` (Git)**
+- Mini-timeline visualization for commits with dot+line connector
+- Each commit shows: hash (7 char), message, author, relative time (e.g. "2 hours ago")
+- Directory header with branch badge and dirty/clean status pill
+- 3/5 + 2/5 grid layout: commit timeline vs status summary + diff stat
+
+**`app/live/LiveContext.tsx`**
+- Added `pending` to `AgentTask.status` union type
+- Added `branch`, `description` fields to `AgentTask`
+- Extracted `GitCommit` type with `author` and `time` fields
+- Increased task poll interval from 10s to 5s
+
+**`app/api/git/route.ts`**
+- Enhanced git log format to `%H|%s|%an|%ar` (hash, subject, author, relative time)
+- Increased to 10 recent commits (from 5)
+
+PR: https://github.com/allenliang2022/agent-monitor/pull/2
+[0m

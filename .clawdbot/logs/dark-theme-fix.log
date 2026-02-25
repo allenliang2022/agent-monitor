@@ -1,0 +1,556 @@
+[0m
+> build · claude-opus-4.6
+[0m
+[0m# [0mTodos
+[ ] Explore codebase structure and read all component files
+[ ] Fix AgentStatusMonitor.tsx dark theme colors
+[ ] Fix FileChangesTreemap.tsx dark theme colors
+[ ] Fix AnimationDistribution.tsx dark theme colors
+[ ] Fix MonitoringPattern.tsx dark theme colors
+[ ] Fix PromptDisplay.tsx dark theme colors
+[ ] Fix ArchitectureOverview.tsx dark theme colors
+[ ] Fix HeaderStats.tsx dark theme colors
+[ ] Fix Timeline.tsx dark theme colors
+[ ] Check globals.css and layout for theme issues
+[ ] Run npm run build and verify it passes
+[ ] Commit and create PR
+[0m
+I'll start by exploring the codebase to understand the current state of all components that need fixing.
+[0m
+[0m→ [0mRead .
+[0m✱ [0mGlob "app/components/**/*.tsx"[90m 10 matches[0m
+[0m✱ [0mGlob "app/**/*.css"[90m 1 match[0m
+[0m✱ [0mGlob "app/layout.tsx"[90m 1 match[0m
+[0m→ [0mRead app/components/AgentStatusMonitor.tsx
+[0m→ [0mRead app/components/FileChangesTreemap.tsx
+[0m→ [0mRead app/components/AnimationDistribution.tsx
+[0m→ [0mRead app/components/MonitoringPattern.tsx
+[0m→ [0mRead app/components/PromptDisplay.tsx
+[0m→ [0mRead app/components/ArchitectureOverview.tsx
+[0m→ [0mRead app/components/HeaderStats.tsx
+[0m→ [0mRead app/components/Timeline.tsx
+[0m→ [0mRead app/globals.css
+[0m→ [0mRead app/layout.tsx
+[0m→ [0mRead app/components/LiveDashboard.tsx
+[0m
+Let me read all the component files and the CSS/layout in parallel:
+[0m
+[0m→ [0mRead app/components/Navbar.tsx
+[0m
+[0m# [0mTodos
+[x] Explore codebase structure and read all component files
+[x] Fix AgentStatusMonitor.tsx dark theme colors
+[x] Fix FileChangesTreemap.tsx dark theme colors
+[x] Fix AnimationDistribution.tsx dark theme colors
+[x] Fix MonitoringPattern.tsx dark theme colors
+[x] Fix PromptDisplay.tsx dark theme colors
+[x] Fix ArchitectureOverview.tsx dark theme colors
+[x] Fix HeaderStats.tsx dark theme colors
+[ ] Fix Timeline.tsx dark theme colors - MAIN ISSUE
+[x] Check globals.css and layout for theme issues
+[ ] Run npm run build and verify it passes
+[ ] Commit and create PR
+[0m
+Now I have a clear picture of the codebase. Let me analyze the issues:
+
+1. **Timeline.tsx** (lines 9-16) - Uses broken shorthand colors like `bg-cyan`, `text-cyan`, `bg-purple`, `text-green`, `text-red`, `text-amber`, `bg-red`, `border-cyan`, etc.
+2. **AgentStatusMonitor.tsx** - Already uses correct classes like `bg-cyan-400/10`, `text-cyan-400`, etc. Looks good.
+3. **FileChangesTreemap.tsx** - Already uses correct classes. Looks good.
+4. **AnimationDistribution.tsx** - Already uses correct classes. Looks good.
+5. **MonitoringPattern.tsx** - Already uses correct classes. Looks good.
+6. **PromptDisplay.tsx** - Already uses correct classes. Looks good.
+7. **ArchitectureOverview.tsx** - Already uses correct classes. Looks good.
+8. **HeaderStats.tsx** - Already uses correct classes. Looks good.
+
+The main offender is **Timeline.tsx** which has the broken shorthand color classes. Let me fix it.
+[0m
+Good news: After reading all 8 component files, **7 out of 8 already use correct Tailwind classes** (like `bg-cyan-400/10`, `text-cyan-400`, `border-emerald-400/20`, etc.). The only file with broken shorthand colors is **Timeline.tsx**.
+
+Let me fix Timeline.tsx - it has many instances of broken shorthand colors:
+[0m
+[0m← [0mEdit app/components/Timeline.tsx
+Index: /Users/liang/work/agent-monitor-worktrees/dark-theme-fix/app/components/Timeline.tsx
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/dark-theme-fix/app/components/Timeline.tsx
++++ /Users/liang/work/agent-monitor-worktrees/dark-theme-fix/app/components/Timeline.tsx
+@@ -6,14 +6,14 @@
+ 
+ type TimelineEvent = (typeof sessionData.timeline)[number];
+ 
+ const eventColors: Record<string, { dot: string; bg: string; border: string; text: string }> = {
+-  request: { dot: "bg-amber", bg: "bg-amber/10", border: "border-amber/20", text: "text-amber" },
+-  analyze: { dot: "bg-purple", bg: "bg-purple/10", border: "border-purple/20", text: "text-purple" },
+-  prompt: { dot: "bg-purple", bg: "bg-purple/10", border: "border-purple/20", text: "text-purple" },
+-  spawn: { dot: "bg-cyan", bg: "bg-cyan/10", border: "border-cyan/20", text: "text-cyan" },
+-  check: { dot: "bg-cyan", bg: "bg-cyan/10", border: "border-cyan/20", text: "text-cyan" },
+-  verify: { dot: "bg-green", bg: "bg-green/10", border: "border-green/20", text: "text-green" },
++  request: { dot: "bg-amber-400", bg: "bg-amber-400/10", border: "border-amber-400/20", text: "text-amber-400" },
++  analyze: { dot: "bg-purple-500", bg: "bg-purple-500/10", border: "border-purple-500/20", text: "text-purple-500" },
++  prompt: { dot: "bg-purple-500", bg: "bg-purple-500/10", border: "border-purple-500/20", text: "text-purple-500" },
++  spawn: { dot: "bg-cyan-400", bg: "bg-cyan-400/10", border: "border-cyan-400/20", text: "text-cyan-400" },
++  check: { dot: "bg-cyan-400", bg: "bg-cyan-400/10", border: "border-cyan-400/20", text: "text-cyan-400" },
++  verify: { dot: "bg-emerald-400", bg: "bg-emerald-400/10", border: "border-emerald-400/20", text: "text-emerald-400" },
+ };
+ 
+ function getEventStyle(event: string) {
+   return eventColors[event] || eventColors.check;
+
+[0m
+Now fix the CommandBlock `text-green` shorthand:
+[0m
+[0m← [0mEdit app/components/Timeline.tsx
+Index: /Users/liang/work/agent-monitor-worktrees/dark-theme-fix/app/components/Timeline.tsx
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/dark-theme-fix/app/components/Timeline.tsx
++++ /Users/liang/work/agent-monitor-worktrees/dark-theme-fix/app/components/Timeline.tsx
+@@ -23,9 +23,9 @@
+ return (
+   <div className="mt-3 rounded-lg bg-black/50 border border-slate-700/50 p-3 font-mono text-xs overflow-x-auto">
+     {commands.map((cmd, i) => (
+       <div key={i} className="flex gap-2">
+-        <span className="text-green shrink-0">$</span>
++        <span className="text-emerald-400 shrink-0">$</span>
+         <span className="text-slate-300">{cmd}</span>
+       </div>
+     ))}
+   </div>
+
+[0m
+Fix the ResultsBlock shorthand colors:
+[0m
+[0m← [0mEdit app/components/Timeline.tsx
+Index: /Users/liang/work/agent-monitor-worktrees/dark-theme-fix/app/components/Timeline.tsx
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/dark-theme-fix/app/components/Timeline.tsx
++++ /Users/liang/work/agent-monitor-worktrees/dark-theme-fix/app/components/Timeline.tsx
+@@ -36,14 +36,14 @@
+ return (
+   <div className="mt-2 rounded-lg bg-black/30 border border-slate-700/30 p-3 font-mono text-xs">
+     {Object.entries(results).map(([key, value]) => (
+       <div key={key} className="flex gap-2 mb-1 last:mb-0">
+-        <span className="text-purple shrink-0">{key}:</span>
++        <span className="text-purple-500 shrink-0">{key}:</span>
+         <span className={`${
+-          value === "ALIVE" ? "text-green" :
+-          value === "DEAD" ? "text-red" :
+-          value === true ? "text-green" :
+-          value === false ? "text-amber" :
++          value === "ALIVE" ? "text-emerald-400" :
++          value === "DEAD" ? "text-red-400" :
++          value === true ? "text-emerald-400" :
++          value === false ? "text-amber-400" :
+           "text-slate-300"
+         }`}>
+           {Array.isArray(value) ? value.join(", ") : String(value)}
+         </span>
+
+[0m
+Fix the Session Timeline heading gradient:
+[0m
+[0m← [0mEdit app/components/Timeline.tsx
+Index: /Users/liang/work/agent-monitor-worktrees/dark-theme-fix/app/components/Timeline.tsx
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/dark-theme-fix/app/components/Timeline.tsx
++++ /Users/liang/work/agent-monitor-worktrees/dark-theme-fix/app/components/Timeline.tsx
+@@ -115,9 +115,9 @@
+   className="flex items-center justify-between mb-10"
+ >
+   <div>
+     <h2 className="text-2xl sm:text-3xl font-bold">
+-      <span className="bg-gradient-to-r from-cyan to-purple bg-clip-text text-transparent">
++      <span className="bg-gradient-to-r from-cyan-400 to-purple-500 bg-clip-text text-transparent">
+         Session Timeline
+       </span>
+     </h2>
+     <p className="text-sm text-slate-400 mt-1 font-mono">
+
+[0m
+Fix the auto-play button colors:
+[0m
+[0m← [0mEdit app/components/Timeline.tsx
+Index: /Users/liang/work/agent-monitor-worktrees/dark-theme-fix/app/components/Timeline.tsx
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/dark-theme-fix/app/components/Timeline.tsx
++++ /Users/liang/work/agent-monitor-worktrees/dark-theme-fix/app/components/Timeline.tsx
+@@ -130,10 +130,10 @@
+   whileTap={{ scale: 0.95 }}
+   onClick={autoPlaying ? stopAutoPlay : startAutoPlay}
+   className={`flex items-center gap-2 px-4 py-2 rounded-lg font-mono text-sm border transition-colors ${
+     autoPlaying
+-      ? "border-red/30 bg-red/10 text-red hover:bg-red/20"
+-      : "border-cyan/30 bg-cyan/10 text-cyan hover:bg-cyan/20"
++      ? "border-red-400/30 bg-red-400/10 text-red-400 hover:bg-red-400/20"
++      : "border-cyan-400/30 bg-cyan-400/10 text-cyan-400 hover:bg-cyan-400/20"
+   }`}
+ >
+   {autoPlaying ? (
+     <>
+
+[0m
+Fix the vertical gradient line:
+[0m
+[0m← [0mEdit app/components/Timeline.tsx
+Index: /Users/liang/work/agent-monitor-worktrees/dark-theme-fix/app/components/Timeline.tsx
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/dark-theme-fix/app/components/Timeline.tsx
++++ /Users/liang/work/agent-monitor-worktrees/dark-theme-fix/app/components/Timeline.tsx
+@@ -156,9 +156,9 @@
+ 
+ {/* Timeline */}
+ <div className="relative">
+   {/* Vertical line */}
+-  <div className="absolute left-[19px] top-0 bottom-0 w-px bg-gradient-to-b from-cyan/30 via-purple/30 to-green/30" />
++  <div className="absolute left-[19px] top-0 bottom-0 w-px bg-gradient-to-b from-cyan-400/30 via-purple-500/30 to-emerald-400/30" />
+ 
+   {events.map((event, i) => {
+     const style = getEventStyle(event.event);
+     const isExpanded = expandedIndex === i;
+
+[0m
+Fix the active ring color:
+[0m
+[0m← [0mEdit app/components/Timeline.tsx
+Index: /Users/liang/work/agent-monitor-worktrees/dark-theme-fix/app/components/Timeline.tsx
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/dark-theme-fix/app/components/Timeline.tsx
++++ /Users/liang/work/agent-monitor-worktrees/dark-theme-fix/app/components/Timeline.tsx
+@@ -188,9 +188,9 @@
+     if (!autoPlaying) setExpandedIndex(isExpanded ? null : i);
+   }}
+   whileHover={!autoPlaying ? { x: 4 } : {}}
+   className={`rounded-xl border ${style.border} ${style.bg} p-4 cursor-pointer transition-all ${
+-    isActive ? "ring-1 ring-cyan/40" : ""
++    isActive ? "ring-1 ring-cyan-400/40" : ""
+   }`}
+ >
+   <div className="flex items-start justify-between gap-3">
+     <div className="flex-1 min-w-0">
+
+[0m
+Fix the assessment text color:
+[0m
+[0m← [0mEdit app/components/Timeline.tsx
+Index: /Users/liang/work/agent-monitor-worktrees/dark-theme-fix/app/components/Timeline.tsx
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/dark-theme-fix/app/components/Timeline.tsx
++++ /Users/liang/work/agent-monitor-worktrees/dark-theme-fix/app/components/Timeline.tsx
+@@ -244,9 +244,9 @@
+     )}
+     {"assessment" in event && event.assessment && (
+       <div className="mt-3 flex items-start gap-2">
+         <span className="text-xs font-mono text-slate-500 uppercase tracking-wider shrink-0">Assessment:</span>
+-        <span className="text-sm text-green">{event.assessment as string}</span>
++        <span className="text-sm text-emerald-400">{event.assessment as string}</span>
+       </div>
+     )}
+   </div>
+ </motion.div>
+
+[0m
+Now let me verify the file looks correct:
+[0m
+[0m$ [0mgrep -n "text-green\b\|text-cyan\b\|text-purple\b\|text-amber\b\|text-red\b\|bg-cyan\b\|bg-purple\b\|bg-green\b\|bg-amber\b\|bg-red\b\|border-cyan\b\|border-purple\b\|border-green\b\|border-amber\b\|border-red\b" /Users/liang/work/agent-monitor-worktrees/dark-theme-fix/app/components/Timeline.tsx || echo "No broken shorthand colors found - CLEAN"
+10:  request: { dot: "bg-amber-400", bg: "bg-amber-400/10", border: "border-amber-400/20", text: "text-amber-400" },
+11:  analyze: { dot: "bg-purple-500", bg: "bg-purple-500/10", border: "border-purple-500/20", text: "text-purple-500" },
+12:  prompt: { dot: "bg-purple-500", bg: "bg-purple-500/10", border: "border-purple-500/20", text: "text-purple-500" },
+13:  spawn: { dot: "bg-cyan-400", bg: "bg-cyan-400/10", border: "border-cyan-400/20", text: "text-cyan-400" },
+14:  check: { dot: "bg-cyan-400", bg: "bg-cyan-400/10", border: "border-cyan-400/20", text: "text-cyan-400" },
+40:          <span className="text-purple-500 shrink-0">{key}:</span>
+43:            value === "DEAD" ? "text-red-400" :
+45:            value === false ? "text-amber-400" :
+134:                ? "border-red-400/30 bg-red-400/10 text-red-400 hover:bg-red-400/20"
+135:                : "border-cyan-400/30 bg-cyan-400/10 text-cyan-400 hover:bg-cyan-400/20"
+[0m
+The grep is matching parts of correct classes (e.g., `text-amber-400` contains `text-amber`). Let me do a more precise check for bare shorthand colors without a following `-`:
+[0m
+[0m$ [0mgrep -nP '(text|bg|border)-(cyan|purple|green|amber|red)(?![a-zA-Z0-9-])(?!/\d)' /Users/liang/work/agent-monitor-worktrees/dark-theme-fix/app/components/Timeline.tsx || echo "CLEAN - no broken shorthand colors"
+grep: invalid option -- P
+usage: grep [-abcdDEFGHhIiJLlMmnOopqRSsUVvwXxZz] [-A num] [-B num] [-C[num]]
+	[-e pattern] [-f file] [--binary-files=value] [--color=when]
+	[--context[=num]] [--directories=action] [--label] [--line-buffered]
+	[--null] [pattern] [file ...]
+CLEAN - no broken shorthand colors
+[0m
+[0m$ [0mrg '(text|bg|border|ring|from|via|to)-(cyan|purple|green|amber|red)(["\s/])' /Users/liang/work/agent-monitor-worktrees/dark-theme-fix/app/components/Timeline.tsx || echo "CLEAN"
+CLEAN
+[0m
+All broken shorthand colors in Timeline.tsx are fixed. Now let me also check all the other component files to make sure none were missed:
+[0m
+[0m$ [0mrg '(text|bg|border|ring|from|via|to)-(cyan|purple|green|amber|red)(["\s/])' /Users/liang/work/agent-monitor-worktrees/dark-theme-fix/app/components/ || echo "ALL CLEAN - no broken shorthand colors in any component"
+ALL CLEAN - no broken shorthand colors in any component
+[0m
+[0m# [0mTodos
+[x] Explore codebase structure and read all component files
+[x] Fix AgentStatusMonitor.tsx dark theme colors
+[x] Fix FileChangesTreemap.tsx dark theme colors
+[x] Fix AnimationDistribution.tsx dark theme colors
+[x] Fix MonitoringPattern.tsx dark theme colors
+[x] Fix PromptDisplay.tsx dark theme colors
+[x] Fix ArchitectureOverview.tsx dark theme colors
+[x] Fix HeaderStats.tsx dark theme colors
+[x] Fix Timeline.tsx dark theme colors - MAIN ISSUE
+[x] Check globals.css and layout for theme issues
+[ ] Run npm run build and verify it passes
+[ ] Commit and create PR
+[0m
+All components are clean. Now let me run the build:
+[0m
+[0m$ [0mnpm run build 2>&1
+> agent-monitor@0.1.0 build
+> next build
+
+▲ Next.js 16.1.6 (Turbopack)
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 2.3s
+  Running TypeScript ...
+  Collecting page data using 9 workers ...
+  Generating static pages using 9 workers (0/17) ...
+  Generating static pages using 9 workers (4/17) 
+  Generating static pages using 9 workers (8/17) 
+  Generating static pages using 9 workers (12/17) 
+✓ Generating static pages using 9 workers (17/17) in 129.7ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ○ /animations
+├ ƒ /api/agent-tasks
+├ ƒ /api/config
+├ ƒ /api/events
+├ ƒ /api/git
+├ ƒ /api/health
+├ ƒ /api/prompts
+├ ƒ /api/sessions
+├ ○ /architecture
+├ ○ /files
+├ ○ /live
+├ ○ /live/agent
+├ ○ /live/git
+├ ○ /live/prompt
+├ ○ /live/tasks
+├ ○ /monitoring
+├ ○ /prompt
+├ ○ /status
+└ ○ /timeline
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+[0m
+[0m$ [0mgit status
+On branch feat/dark-theme-fix
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   app/components/Timeline.tsx
+
+no changes added to commit (use "git add" and/or "git commit -a")
+[0m
+[0m$ [0mgit log --oneline -5
+3f375e7 chore: add .clawdbot agent swarm setup
+bf69527 refactor: refocus Live dashboard on coding agent monitoring (remove config/sessions/agents, add tasks/agent)
+e0d9cf9 feat: show actual agent prompts on /live/prompt page
+9b9b80a refactor: split Live dashboard into 6 sub-pages with shared SSE context
+b42300b feat: add Prompt Architecture section to Live dashboard
+[0m
+[0m$ [0mgit diff
+diff --git a/app/components/Timeline.tsx b/app/components/Timeline.tsx
+index 9045190..acbc4f4 100644
+--- a/app/components/Timeline.tsx
++++ b/app/components/Timeline.tsx
+@@ -7,12 +7,12 @@ import sessionData from "@/data/swarm-session.json";
+ type TimelineEvent = (typeof sessionData.timeline)[number];
+ 
+ const eventColors: Record<string, { dot: string; bg: string; border: string; text: string }> = {
+-  request: { dot: "bg-amber", bg: "bg-amber/10", border: "border-amber/20", text: "text-amber" },
+-  analyze: { dot: "bg-purple", bg: "bg-purple/10", border: "border-purple/20", text: "text-purple" },
+-  prompt: { dot: "bg-purple", bg: "bg-purple/10", border: "border-purple/20", text: "text-purple" },
+-  spawn: { dot: "bg-cyan", bg: "bg-cyan/10", border: "border-cyan/20", text: "text-cyan" },
+-  check: { dot: "bg-cyan", bg: "bg-cyan/10", border: "border-cyan/20", text: "text-cyan" },
+-  verify: { dot: "bg-green", bg: "bg-green/10", border: "border-green/20", text: "text-green" },
++  request: { dot: "bg-amber-400", bg: "bg-amber-400/10", border: "border-amber-400/20", text: "text-amber-400" },
++  analyze: { dot: "bg-purple-500", bg: "bg-purple-500/10", border: "border-purple-500/20", text: "text-purple-500" },
++  prompt: { dot: "bg-purple-500", bg: "bg-purple-500/10", border: "border-purple-500/20", text: "text-purple-500" },
++  spawn: { dot: "bg-cyan-400", bg: "bg-cyan-400/10", border: "border-cyan-400/20", text: "text-cyan-400" },
++  check: { dot: "bg-cyan-400", bg: "bg-cyan-400/10", border: "border-cyan-400/20", text: "text-cyan-400" },
++  verify: { dot: "bg-emerald-400", bg: "bg-emerald-400/10", border: "border-emerald-400/20", text: "text-emerald-400" },
+ };
+ 
+ function getEventStyle(event: string) {
+@@ -24,7 +24,7 @@ function CommandBlock({ commands }: { commands: string[] }) {
+     <div className="mt-3 rounded-lg bg-black/50 border border-slate-700/50 p-3 font-mono text-xs overflow-x-auto">
+       {commands.map((cmd, i) => (
+         <div key={i} className="flex gap-2">
+-          <span className="text-green shrink-0">$</span>
++          <span className="text-emerald-400 shrink-0">$</span>
+           <span className="text-slate-300">{cmd}</span>
+         </div>
+       ))}
+@@ -37,12 +37,12 @@ function ResultsBlock({ results }: { results: Record<string, unknown> }) {
+     <div className="mt-2 rounded-lg bg-black/30 border border-slate-700/30 p-3 font-mono text-xs">
+       {Object.entries(results).map(([key, value]) => (
+         <div key={key} className="flex gap-2 mb-1 last:mb-0">
+-          <span className="text-purple shrink-0">{key}:</span>
++          <span className="text-purple-500 shrink-0">{key}:</span>
+           <span className={`${
+-            value === "ALIVE" ? "text-green" :
+-            value === "DEAD" ? "text-red" :
+-            value === true ? "text-green" :
+-            value === false ? "text-amber" :
++            value === "ALIVE" ? "text-emerald-400" :
++            value === "DEAD" ? "text-red-400" :
++            value === true ? "text-emerald-400" :
++            value === false ? "text-amber-400" :
+             "text-slate-300"
+           }`}>
+             {Array.isArray(value) ? value.join(", ") : String(value)}
+@@ -116,7 +116,7 @@ export default function Timeline() {
+         >
+           <div>
+             <h2 className="text-2xl sm:text-3xl font-bold">
+-              <span className="bg-gradient-to-r from-cyan to-purple bg-clip-text text-transparent">
++              <span className="bg-gradient-to-r from-cyan-400 to-purple-500 bg-clip-text text-transparent">
+                 Session Timeline
+               </span>
+             </h2>
+@@ -131,8 +131,8 @@ export default function Timeline() {
+             onClick={autoPlaying ? stopAutoPlay : startAutoPlay}
+             className={`flex items-center gap-2 px-4 py-2 rounded-lg font-mono text-sm border transition-colors ${
+               autoPlaying
+-                ? "border-red/30 bg-red/10 text-red hover:bg-red/20"
+-                : "border-cyan/30 bg-cyan/10 text-cyan hover:bg-cyan/20"
++                ? "border-red-400/30 bg-red-400/10 text-red-400 hover:bg-red-400/20"
++                : "border-cyan-400/30 bg-cyan-400/10 text-cyan-400 hover:bg-cyan-400/20"
+             }`}
+           >
+             {autoPlaying ? (
+@@ -157,7 +157,7 @@ export default function Timeline() {
+         {/* Timeline */}
+         <div className="relative">
+           {/* Vertical line */}
+-          <div className="absolute left-[19px] top-0 bottom-0 w-px bg-gradient-to-b from-cyan/30 via-purple/30 to-green/30" />
++          <div className="absolute left-[19px] top-0 bottom-0 w-px bg-gradient-to-b from-cyan-400/30 via-purple-500/30 to-emerald-400/30" />
+ 
+           {events.map((event, i) => {
+             const style = getEventStyle(event.event);
+@@ -189,7 +189,7 @@ export default function Timeline() {
+                   }}
+                   whileHover={!autoPlaying ? { x: 4 } : {}}
+                   className={`rounded-xl border ${style.border} ${style.bg} p-4 cursor-pointer transition-all ${
+-                    isActive ? "ring-1 ring-cyan/40" : ""
++                    isActive ? "ring-1 ring-cyan-400/40" : ""
+                   }`}
+                 >
+                   <div className="flex items-start justify-between gap-3">
+@@ -245,7 +245,7 @@ export default function Timeline() {
+                           {"assessment" in event && event.assessment && (
+                             <div className="mt-3 flex items-start gap-2">
+                               <span className="text-xs font-mono text-slate-500 uppercase tracking-wider shrink-0">Assessment:</span>
+-                              <span className="text-sm text-green">{event.assessment as string}</span>
++                              <span className="text-sm text-emerald-400">{event.assessment as string}</span>
+                             </div>
+                           )}
+                         </div>
+[0m
+Build passes successfully. Now let me commit and check for a remote:
+[0m
+The diff is clean and correct. Let me now commit:
+[0m
+[0m$ [0mgit add -A && git commit -m 'fix: dark theme colors for all dashboard components
+
+Replace broken Tailwind v4 shorthand color classes in Timeline.tsx
+with standard Tailwind classes (e.g. bg-cyan -> bg-cyan-400,
+text-green -> text-emerald-400, border-purple -> border-purple-500).
+
+All other components were already using correct color classes.'
+[feat/dark-theme-fix 5654d3a] fix: dark theme colors for all dashboard components
+ Committer: Liang <liang@LiangdeMac-mini.local>
+Your name and email address were configured automatically based
+on your username and hostname. Please check that they are accurate.
+You can suppress this message by setting them explicitly. Run the
+following command and follow the instructions in your editor to edit
+your configuration file:
+
+    git config --global --edit
+
+After doing this, you may fix the identity used for this commit with:
+
+    git commit --amend --reset-author
+
+ 1 file changed, 18 insertions(+), 18 deletions(-)
+[0m
+[0m$ [0mgit remote -v
+origin	https://github.com/allenliang2022/agent-monitor.git (fetch)
+origin	https://github.com/allenliang2022/agent-monitor.git (push)
+[0m
+Remote exists. Let me push and create a PR:
+[0m
+[0m$ [0mgit push -u origin feat/dark-theme-fix 2>&1
+remote: 
+remote: Create a pull request for 'feat/dark-theme-fix' on GitHub by visiting:        
+remote:      https://github.com/allenliang2022/agent-monitor/pull/new/feat/dark-theme-fix        
+remote: 
+To https://github.com/allenliang2022/agent-monitor.git
+ * [new branch]      feat/dark-theme-fix -> feat/dark-theme-fix
+branch 'feat/dark-theme-fix' set up to track 'origin/feat/dark-theme-fix'.
+[0m
+[0m$ [0mgh pr create --title "fix: dark theme colors for Timeline component" --body "$(cat <<'EOF'
+## Summary
+
+- Fixed broken Tailwind v4 shorthand color classes in `Timeline.tsx` that caused elements to render with white/invisible colors instead of the dark theme palette
+- Replaced all bare color shorthands (`bg-cyan`, `text-green`, `border-purple`, etc.) with standard Tailwind classes (`bg-cyan-400`, `text-emerald-400`, `border-purple-500`, etc.)
+- All other 7 components were already using correct color classes
+
+## Color mapping applied
+| Before | After |
+|--------|-------|
+| `bg-cyan`, `text-cyan` | `bg-cyan-400`, `text-cyan-400` |
+| `bg-purple`, `text-purple` | `bg-purple-500`, `text-purple-500` |
+| `bg-green`, `text-green` | `bg-emerald-400`, `text-emerald-400` |
+| `bg-amber`, `text-amber` | `bg-amber-400`, `text-amber-400` |
+| `bg-red`, `text-red` | `bg-red-400`, `text-red-400` |
+
+## Verification
+- `npm run build` passes with 0 errors
+- All components verified clean of shorthand color classes
+EOF
+)" 2>&1
+https://github.com/allenliang2022/agent-monitor/pull/1
+[0m
+[0m# [0mTodos
+[x] Explore codebase structure and read all component files
+[x] Fix AgentStatusMonitor.tsx dark theme colors
+[x] Fix FileChangesTreemap.tsx dark theme colors
+[x] Fix AnimationDistribution.tsx dark theme colors
+[x] Fix MonitoringPattern.tsx dark theme colors
+[x] Fix PromptDisplay.tsx dark theme colors
+[x] Fix ArchitectureOverview.tsx dark theme colors
+[x] Fix HeaderStats.tsx dark theme colors
+[x] Fix Timeline.tsx dark theme colors - MAIN ISSUE
+[x] Check globals.css and layout for theme issues
+[x] Run npm run build and verify it passes
+[x] Commit and create PR
+[0m
+All done. Here's a summary:
+
+## Results
+
+**Only 1 file needed fixing:** `app/components/Timeline.tsx` (18 lines changed)
+
+The other 7 components (AgentStatusMonitor, FileChangesTreemap, AnimationDistribution, MonitoringPattern, PromptDisplay, ArchitectureOverview, HeaderStats) were **already using correct standard Tailwind classes** like `bg-cyan-400/10`, `text-emerald-400`, `border-purple-500/20`, etc.
+
+**What was fixed in Timeline.tsx:**
+- `eventColors` map: all 6 event types had bare shorthands (`bg-cyan`, `text-amber`, etc.)
+- `CommandBlock`: `text-green` -> `text-emerald-400`
+- `ResultsBlock`: `text-purple`, `text-green`, `text-red`, `text-amber` -> proper classes
+- Header gradient: `from-cyan to-purple` -> `from-cyan-400 to-purple-500`
+- Auto-play button: `border-red/30 bg-red/10 text-red` -> `border-red-400/30 bg-red-400/10 text-red-400` (and same for cyan)
+- Timeline vertical line gradient: `from-cyan/30 via-purple/30 to-green/30` -> proper classes
+- Active ring: `ring-cyan/40` -> `ring-cyan-400/40`
+- Assessment text: `text-green` -> `text-emerald-400`
+
+**Build:** Passes clean  
+**PR:** https://github.com/allenliang2022/agent-monitor/pull/1
+[0m
