@@ -1,97 +1,102 @@
+import { readFileSync, existsSync } from "fs";
+import { join } from "path";
 import { execSync } from "child_process";
 
 export const dynamic = "force-dynamic";
 
-function safeExec(cmd: string): string {
+const OPENCLAW_DIR = join(process.env.HOME || "/Users/liang", ".openclaw");
+
+interface SessionEntry {
+  key: string;
+  updatedAt: number;
+  agentId?: string;
+  [k: string]: unknown;
+}
+
+function readSessionStore(agentId: string): SessionEntry[] {
+  const storePath = join(OPENCLAW_DIR, "agents", agentId, "sessions", "sessions.json");
+  if (!existsSync(storePath)) return [];
   try {
-    return execSync(cmd, { encoding: "utf-8", timeout: 10000 }).trim();
+    const data = JSON.parse(readFileSync(storePath, "utf-8"));
+    return Object.entries(data).map(([key, val]) => ({
+      key,
+      ...(val as Record<string, unknown>),
+      agentId,
+    })) as SessionEntry[];
   } catch {
-    return "";
+    return [];
   }
 }
 
-function getSessions(): unknown {
-  const output = safeExec(
-    "openclaw sessions --json --active 60 --all-agents 2>/dev/null"
-  );
-  if (!output) return { sessions: [], error: "Could not fetch sessions" };
+function getGitStatus(dir: string): Record<string, unknown> | null {
   try {
-    return JSON.parse(output);
+    const branch = execSync("git rev-parse --abbrev-ref HEAD", { cwd: dir, encoding: "utf-8", timeout: 3000 }).trim();
+    const statusOut = execSync("git status --short", { cwd: dir, encoding: "utf-8", timeout: 3000 }).trim();
+    const logOut = execSync("git log --oneline -5", { cwd: dir, encoding: "utf-8", timeout: 3000 }).trim();
+    return {
+      branch,
+      dirty: statusOut.split("\n").filter(Boolean).length,
+      recentCommits: logOut.split("\n").filter(Boolean),
+      statusFiles: statusOut.split("\n").filter(Boolean).slice(0, 20),
+    };
   } catch {
-    return { sessions: [], error: "Invalid JSON from openclaw" };
+    return null;
   }
 }
 
-function getHealth(): Record<string, string> {
-  const output = safeExec("openclaw health 2>&1");
-  const result: Record<string, string> = {
-    status: output ? "healthy" : "unhealthy",
-    raw: output,
+function collectData() {
+  const agents = ["main", "girlfriend", "xiaolongnv"];
+  const cutoff = Date.now() - 60 * 60 * 1000;
+  const allSessions: SessionEntry[] = [];
+  for (const agentId of agents) {
+    const sessions = readSessionStore(agentId);
+    for (const s of sessions) {
+      if (s.updatedAt && s.updatedAt > cutoff) {
+        allSessions.push(s);
+      }
+    }
+  }
+  allSessions.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+
+  const watchDirs = ["/Users/liang/work/agent-monitor"];
+  const gitStatuses: Record<string, unknown> = {};
+  for (const dir of watchDirs) {
+    gitStatuses[dir] = getGitStatus(dir);
+  }
+
+  return {
+    type: "update",
+    timestamp: new Date().toISOString(),
+    sessions: { count: allSessions.length, sessions: allSessions },
+    git: gitStatuses,
   };
-  if (output.toLowerCase().includes("error")) {
-    result.status = "unhealthy";
-  }
-  return result;
 }
 
 export async function GET() {
   const encoder = new TextEncoder();
+  let intervalId: ReturnType<typeof setInterval> | null = null;
 
   const stream = new ReadableStream({
     start(controller) {
-      // Send initial data immediately
-      const sendUpdate = () => {
+      const send = () => {
         try {
-          const sessions = getSessions();
-          const health = getHealth();
-
-          const update = {
-            type: "update",
-            timestamp: new Date().toISOString(),
-            sessions,
-            health,
-          };
-
-          controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify(update)}\n\n`)
-          );
-        } catch {
+          const update = collectData();
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(update)}\n\n`));
+        } catch (e) {
           const errorEvent = {
             type: "error",
             timestamp: new Date().toISOString(),
-            message: "Failed to collect data",
+            message: e instanceof Error ? e.message : "Failed to collect data",
           };
-          controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify(errorEvent)}\n\n`)
-          );
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(errorEvent)}\n\n`));
         }
       };
 
-      // Send immediately, then every 5 seconds
-      sendUpdate();
-      const interval = setInterval(sendUpdate, 5000);
-
-      // Cleanup when the client disconnects
-      // The controller.close() is handled by the client disconnect
-      // We store interval ref for cleanup
-      const cleanup = () => {
-        clearInterval(interval);
-        try {
-          controller.close();
-        } catch {
-          // Already closed
-        }
-      };
-
-      // AbortSignal isn't directly available here, so we rely on
-      // the stream erroring out when client disconnects
-      // Store cleanup for the cancel handler
-      (stream as unknown as { _cleanup: () => void })._cleanup = cleanup;
+      send();
+      intervalId = setInterval(send, 5000);
     },
     cancel() {
-      // Client disconnected - interval cleanup
-      const s = stream as unknown as { _cleanup?: () => void };
-      if (s._cleanup) s._cleanup();
+      if (intervalId) clearInterval(intervalId);
     },
   });
 
