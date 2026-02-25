@@ -3,6 +3,8 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Navbar from "./components/Navbar";
 import KeyboardShortcuts from "./components/KeyboardShortcuts";
+import CommandPalette from "./components/CommandPalette";
+import { ToastProvider } from "./components/Toast";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -32,9 +34,12 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased scanline`}
       >
-        <Navbar />
-        <KeyboardShortcuts />
-        {children}
+        <ToastProvider>
+          <Navbar />
+          <KeyboardShortcuts />
+          <CommandPalette />
+          {children}
+        </ToastProvider>
       </body>
     </html>
   );

@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useLive } from "../LiveContext";
 import type { AgentTask } from "../LiveContext";
 import { CardListSkeleton, useMinimumLoading } from "../components/LoadingSkeleton";
+import { useToast } from "../../components/Toast";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -177,9 +178,10 @@ function TaskCard({ task, index }: { task: AgentTask; index: number }) {
 interface SpawnModalProps {
   open: boolean;
   onClose: () => void;
+  onSuccess?: (taskId: string) => void;
 }
 
-function SpawnTaskModal({ open, onClose }: SpawnModalProps) {
+function SpawnTaskModal({ open, onClose, onSuccess }: SpawnModalProps) {
   const [taskId, setTaskId] = useState("");
   const [description, setDescription] = useState("");
   const [prompt, setPrompt] = useState("");
@@ -248,6 +250,7 @@ function SpawnTaskModal({ open, onClose }: SpawnModalProps) {
       }
 
       setSuccess(true);
+      onSuccess?.(taskId.trim());
       setTimeout(() => {
         resetForm();
         onClose();
@@ -426,8 +429,16 @@ function SpawnTaskModal({ open, onClose }: SpawnModalProps) {
 
 export default function TasksPage() {
   const { tasks, initialLoading } = useLive();
+  const { toast } = useToast();
   const dataReady = useMinimumLoading(!initialLoading);
   const [spawnOpen, setSpawnOpen] = useState(false);
+
+  const handleSpawnSuccess = useCallback(
+    (taskId: string) => {
+      toast(`Task "${taskId}" spawned!`, "success");
+    },
+    [toast]
+  );
 
   // Listen for keyboard shortcut to open new task modal
   useEffect(() => {
@@ -604,7 +615,7 @@ export default function TasksPage() {
       </motion.section>
 
       {/* ── Spawn Task Modal ─────────────────────────────────────────────── */}
-      <SpawnTaskModal open={spawnOpen} onClose={() => setSpawnOpen(false)} />
+      <SpawnTaskModal open={spawnOpen} onClose={() => setSpawnOpen(false)} onSuccess={handleSpawnSuccess} />
     </div>
   );
 }
