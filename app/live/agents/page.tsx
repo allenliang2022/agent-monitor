@@ -25,6 +25,7 @@ function stepIndex(status: AgentTask["status"]): number {
     case "completed":
       return 5;
     case "failed":
+    case "dead":
       return 1;
     default:
       return 0;
@@ -109,12 +110,13 @@ function statusBadge(status: AgentTask["status"]): {
         border: "border-emerald-400/20",
         label: "DONE",
       };
+    case "dead":
     case "failed":
       return {
         bg: "bg-red-400/10",
         text: "text-red-400",
         border: "border-red-400/20",
-        label: "FAILED",
+        label: status === "dead" ? "DEAD" : "FAILED",
       };
     case "pending":
       return {
@@ -165,7 +167,7 @@ function useElapsedTime(startedAt: string): string {
 
 function ProgressStepper({ status }: { status: AgentTask["status"] }) {
   const current = stepIndex(status);
-  const isFailed = status === "failed" || status === "ci_failed";
+  const isFailed = status === "failed" || status === "ci_failed" || status === "dead";
 
   return (
     <div className="flex items-center gap-1 w-full mt-3">
@@ -291,9 +293,9 @@ function AgentCard({
   const status = statusBadge(task.status);
   const isRunning = task.status === "running";
 
-  const filesChanged = fileData?.files?.length ?? task.filesChanged ?? 0;
-  const linesAdded = fileData?.totalAdditions ?? 0;
-  const linesRemoved = fileData?.totalDeletions ?? 0;
+  const filesChanged = fileData?.files?.length ?? task.liveFileCount ?? task.filesChanged ?? 0;
+  const linesAdded = fileData?.totalAdditions ?? task.liveAdditions ?? 0;
+  const linesRemoved = fileData?.totalDeletions ?? task.liveDeletions ?? 0;
 
   return (
     <motion.div

@@ -1,0 +1,296 @@
+[0m
+> build · claude-opus-4.6
+[0m
+[0m→ [0mRead LIVE_REDESIGN_SPEC.md
+[0m• [0mExplore codebase structure[90m Explore Agent[0m
+[0m
+I'll start by reading the spec file and exploring the current codebase to understand the existing structure.
+[0m
+[0m✓ [0mExplore codebase structure[90m Explore Agent[0m
+[0m→ [0mRead app/api/agent-tasks/route.ts
+[0m→ [0mRead app/api/events/route.ts
+[0m→ [0mRead app/live/LiveContext.tsx
+[0m→ [0mRead app/api/git/route.ts
+[0m→ [0mRead .clawdbot/active-tasks.json
+[0m→ [0mRead data/agent-tasks.json
+[0m
+Now let me read the existing API routes and LiveContext that I need to modify:
+[0m
+[0m→ [0mRead .clawdbot/logs
+[0m→ [0mRead next.config.ts
+[0m
+Good, I now have full context. Let me also check the .clawdbot/logs directory and the next.config:
+[0m
+Now I have full context. Let me plan and execute all the tasks.
+[0m
+[0m# [0mTodos
+[ ] CREATE /api/agent-log/route.ts - read last 100 lines from .clawdbot/logs/<task-id>.log
+[ ] CREATE /api/file-changes/route.ts - git diff --stat for worktree paths
+[ ] ENHANCE /api/agent-tasks/route.ts - read from .clawdbot/active-tasks.json + tmux check
+[ ] ENHANCE /api/events/route.ts - include tasks + file-changes in SSE
+[ ] UPDATE app/live/LiveContext.tsx - add tasks, fileChanges, new types
+[ ] Run npm run build and fix any errors
+[ ] Commit changes
+[0m
+[0m# [0mTodos
+[ ] CREATE /api/agent-log/route.ts - read last 100 lines from .clawdbot/logs/<task-id>.log
+[ ] CREATE /api/file-changes/route.ts - git diff --stat for worktree paths
+[ ] ENHANCE /api/agent-tasks/route.ts - read from .clawdbot/active-tasks.json + tmux check
+[ ] ENHANCE /api/events/route.ts - include tasks + file-changes in SSE
+[ ] UPDATE app/live/LiveContext.tsx - add tasks, fileChanges, new types
+[ ] Run npm run build and fix any errors
+[ ] Commit changes
+[0m
+Let me create the first two new API routes and start enhancing the existing ones. I'll do the independent file creations in parallel:
+[0m
+[0m$ [0mmkdir -p app/api/agent-log app/api/file-changes
+[0m
+[0m← [0mWrite app/api/agent-log/route.ts
+Wrote file successfully.
+[0m
+Now let me create all the files. I'll do the two new routes and the two enhanced routes in parallel:
+[0m
+[0m← [0mWrite app/api/file-changes/route.ts
+Wrote file successfully.
+[0m
+[0m# [0mTodos
+[x] CREATE /api/agent-log/route.ts - read last 100 lines from .clawdbot/logs/<task-id>.log
+[x] CREATE /api/file-changes/route.ts - git diff --stat for worktree paths
+[ ] ENHANCE /api/agent-tasks/route.ts - read from .clawdbot/active-tasks.json + tmux check
+[ ] ENHANCE /api/events/route.ts - include tasks + file-changes in SSE
+[ ] UPDATE app/live/LiveContext.tsx - add tasks, fileChanges, new types
+[ ] Run npm run build and fix any errors
+[ ] Commit changes
+[0m
+Now let me enhance the agent-tasks route and the events route:
+[0m
+[0m← [0mWrite app/api/agent-tasks/route.ts
+Wrote file successfully.
+[0m
+[0m# [0mTodos
+[x] CREATE /api/agent-log/route.ts - read last 100 lines from .clawdbot/logs/<task-id>.log
+[x] CREATE /api/file-changes/route.ts - git diff --stat for worktree paths
+[x] ENHANCE /api/agent-tasks/route.ts - read from .clawdbot/active-tasks.json + tmux check
+[ ] ENHANCE /api/events/route.ts - include tasks + file-changes in SSE
+[ ] UPDATE app/live/LiveContext.tsx - add tasks, fileChanges, new types
+[ ] Run npm run build and fix any errors
+[ ] Commit changes
+[0m
+Now let me enhance the SSE events route to include tasks and file changes:
+[0m
+[0m← [0mWrite app/api/events/route.ts
+Wrote file successfully.
+[0m
+[0m# [0mTodos
+[x] CREATE /api/agent-log/route.ts - read last 100 lines from .clawdbot/logs/<task-id>.log
+[x] CREATE /api/file-changes/route.ts - git diff --stat for worktree paths
+[x] ENHANCE /api/agent-tasks/route.ts - read from .clawdbot/active-tasks.json + tmux check
+[x] ENHANCE /api/events/route.ts - include tasks + file-changes in SSE
+[ ] UPDATE app/live/LiveContext.tsx - add tasks, fileChanges, new types
+[ ] Run npm run build and fix any errors
+[ ] Commit changes
+[0m
+Now let me update LiveContext.tsx to add the new types and integrate tasks/fileChanges from SSE:
+[0m
+[0m← [0mWrite app/live/LiveContext.tsx
+Wrote file successfully.
+[0m
+[0m# [0mTodos
+[x] CREATE /api/agent-log/route.ts - read last 100 lines from .clawdbot/logs/<task-id>.log
+[x] CREATE /api/file-changes/route.ts - git diff --stat for worktree paths
+[x] ENHANCE /api/agent-tasks/route.ts - read from .clawdbot/active-tasks.json + tmux check
+[x] ENHANCE /api/events/route.ts - include tasks + file-changes in SSE
+[x] UPDATE app/live/LiveContext.tsx - add tasks, fileChanges, new types
+[ ] Check consumers of LiveContext for breakage from new fileChanges field
+[ ] Run npm run build and fix any errors
+[ ] Commit changes
+[0m
+Let me check what live pages consume from LiveContext — they might destructure and break if types changed:
+[0m
+[0m✱ [0mGrep "useLive\(\)"[90m 5 matches[0m
+[0m→ [0mRead app/live/tasks/page.tsx
+[0m→ [0mRead app/live/agent/page.tsx
+[0m
+Let me quickly check the tasks page and agent page to see if they reference AgentTask fields that changed:
+[0m
+[0m→ [0mRead app/live/page.tsx
+[0m
+The existing consumers look fine - they only destructure fields that still exist (tasks, eventLog, connected, etc.). The new `fileChanges` field is additive and won't break anything. The `AgentTask` type changes are also backwards-compatible since `tmuxAlive` and `worktreePath` will be present in data from the enhanced API, and the status union type was expanded (superset of the old one).
+
+Let me now run the build to check for any issues:
+[0m
+[0m# [0mTodos
+[x] CREATE /api/agent-log/route.ts - read last 100 lines from .clawdbot/logs/<task-id>.log
+[x] CREATE /api/file-changes/route.ts - git diff --stat for worktree paths
+[x] ENHANCE /api/agent-tasks/route.ts - read from .clawdbot/active-tasks.json + tmux check
+[x] ENHANCE /api/events/route.ts - include tasks + file-changes in SSE
+[x] UPDATE app/live/LiveContext.tsx - add tasks, fileChanges, new types
+[x] Check consumers of LiveContext for breakage from new fileChanges field
+[ ] Run npm run build and fix any errors
+[ ] Commit changes
+[0m
+[0m$ [0mnpm run build 2>&1
+> agent-monitor@0.1.0 build
+> next build
+
+▲ Next.js 16.1.6 (Turbopack)
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 2.3s
+  Running TypeScript ...
+  Collecting page data using 9 workers ...
+  Generating static pages using 9 workers (0/16) ...
+  Generating static pages using 9 workers (4/16) 
+  Generating static pages using 9 workers (8/16) 
+  Generating static pages using 9 workers (12/16) 
+✓ Generating static pages using 9 workers (16/16) in 159.3ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ○ /animations
+├ ƒ /api/agent-log
+├ ƒ /api/agent-tasks
+├ ƒ /api/config
+├ ƒ /api/events
+├ ƒ /api/file-changes
+├ ƒ /api/git
+├ ƒ /api/health
+├ ƒ /api/prompts
+├ ƒ /api/sessions
+├ ○ /architecture
+├ ○ /files
+├ ○ /live
+├ ○ /live/agent
+├ ○ /live/git
+├ ○ /live/prompt
+├ ○ /live/tasks
+├ ○ /monitoring
+├ ○ /prompt
+├ ○ /status
+└ ○ /timeline
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+[0m
+[0m# [0mTodos
+[x] CREATE /api/agent-log/route.ts - read last 100 lines from .clawdbot/logs/<task-id>.log
+[x] CREATE /api/file-changes/route.ts - git diff --stat for worktree paths
+[x] ENHANCE /api/agent-tasks/route.ts - read from .clawdbot/active-tasks.json + tmux check
+[x] ENHANCE /api/events/route.ts - include tasks + file-changes in SSE
+[x] UPDATE app/live/LiveContext.tsx - add tasks, fileChanges, new types
+[x] Check consumers of LiveContext for breakage from new fileChanges field
+[x] Run npm run build and fix any errors
+[ ] Commit changes
+[0m
+Build passes cleanly. All routes are correctly showing up:
+- `/api/agent-log` (new, dynamic)
+- `/api/file-changes` (new, dynamic)
+- `/api/agent-tasks` (enhanced, dynamic)
+- `/api/events` (enhanced, dynamic)
+
+Now let me commit:
+[0m
+[0m$ [0mgit status
+On branch feat/live-apis
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   app/api/agent-tasks/route.ts
+	modified:   app/api/events/route.ts
+	modified:   app/live/LiveContext.tsx
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	app/api/agent-log/
+	app/api/file-changes/
+
+no changes added to commit (use "git add" and/or "git commit -a")
+[0m
+[0m$ [0mgit diff --stat
+app/api/agent-tasks/route.ts | 104 +++++++++++++++++++++++++++--
+ app/api/events/route.ts      | 156 +++++++++++++++++++++++++++++++++++++++++++
+ app/live/LiveContext.tsx     |  35 +++++++++-
+ 3 files changed, 288 insertions(+), 7 deletions(-)
+[0m
+[0m$ [0mgit log --oneline -5
+a836060 docs: add live dashboard redesign spec
+26e896e Merge branch 'feat/live-polish'
+4c5a891 feat: polish live dashboard with mission control UX
+5654d3a fix: dark theme colors for all dashboard components
+3f375e7 chore: add .clawdbot agent swarm setup
+[0m
+[0m$ [0mgit add -A && git commit -m 'feat: new API routes and enhanced SSE for live dashboard'
+[feat/live-apis 62ce6ab] feat: new API routes and enhanced SSE for live dashboard
+ Committer: Liang <liang@LiangdeMac-mini.local>
+Your name and email address were configured automatically based
+on your username and hostname. Please check that they are accurate.
+You can suppress this message by setting them explicitly. Run the
+following command and follow the instructions in your editor to edit
+your configuration file:
+
+    git config --global --edit
+
+After doing this, you may fix the identity used for this commit with:
+
+    git commit --amend --reset-author
+
+ 5 files changed, 452 insertions(+), 7 deletions(-)
+ create mode 100644 app/api/agent-log/route.ts
+ create mode 100644 app/api/file-changes/route.ts
+[0m
+[0m$ [0mgit status
+On branch feat/live-apis
+nothing to commit, working tree clean
+[0m
+[0m# [0mTodos
+[x] CREATE /api/agent-log/route.ts - read last 100 lines from .clawdbot/logs/<task-id>.log
+[x] CREATE /api/file-changes/route.ts - git diff --stat for worktree paths
+[x] ENHANCE /api/agent-tasks/route.ts - read from .clawdbot/active-tasks.json + tmux check
+[x] ENHANCE /api/events/route.ts - include tasks + file-changes in SSE
+[x] UPDATE app/live/LiveContext.tsx - add tasks, fileChanges, new types
+[x] Check consumers of LiveContext for breakage from new fileChanges field
+[x] Run npm run build and fix any errors
+[x] Commit changes
+[0m
+All done. Here's a summary of what was implemented:
+
+## Changes Made
+
+### 1. NEW: `/api/agent-log/route.ts`
+- `GET /api/agent-log?task=<task-id>` - reads last 100 lines from `.clawdbot/logs/<task-id>.log`
+- Returns `{ taskId, lines: string[], timestamp }`
+- Sanitizes task ID to prevent path traversal
+- Returns empty lines array with error message for missing files (no 404)
+
+### 2. NEW: `/api/file-changes/route.ts`
+- `GET /api/file-changes?dir=<worktree-path>` - runs `git diff --numstat` for precise per-file stats
+- Tries `git merge-base main HEAD` first, falls back to `HEAD~10`
+- Includes uncommitted + staged changes
+- Returns `{ files: [{ path, additions, deletions }], totalAdditions, totalDeletions }`
+
+### 3. ENHANCED: `/api/agent-tasks/route.ts`
+- Now reads from `.clawdbot/active-tasks.json` instead of `data/agent-tasks.json`
+- For each task, checks tmux session liveness via `tmux has-session -t <session>`
+- Adds `tmuxAlive: boolean` and `worktreePath` to each task
+- Handles both `[]` array and `{ tasks: [] }` JSON formats
+- Derives worktree path from project base + `-worktrees/` convention
+
+### 4. ENHANCED: `/api/events/route.ts` (SSE)
+- Now includes `tasks` array in every SSE update (polled from `active-tasks.json`)
+- Now includes `fileChanges` map keyed by worktree path for each active task
+- SSE data shape: `{ type, timestamp, sessions, git, tasks: [], fileChanges: {} }`
+- Each task enriched with `tmuxAlive` and `worktreePath`
+
+### 5. UPDATED: `app/live/LiveContext.tsx`
+- Added `FileChange` and `FileChangesResult` types (exported)
+- Extended `AgentTask` with `tmuxAlive`, `worktreePath`, `tmuxSession` fields
+- Expanded `AgentTask.status` union with `ci_pending | ci_failed | ready_for_review | done`
+- Added `fileChanges` to SSE update parsing and context state
+- `useLive()` now provides `fileChanges: Record<string, FileChangesResult>`
+- SSE handler updates both `tasks` and `fileChanges` from stream data
+
+**Build:** Passes cleanly. **Commit:** `62ce6ab` on `feat/live-apis`.
+[0m

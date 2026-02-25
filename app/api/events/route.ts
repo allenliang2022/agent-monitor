@@ -131,15 +131,53 @@ function readActiveTasks() {
     const rawTasks: RawTask[] = Array.isArray(data) ? data : data.tasks || [];
 
     return rawTasks.map((task) => {
-      const tmuxSession = task.tmuxSession || task.id || "";
+            const tmuxSession = task.tmuxSession || task.id || "";
       const tmuxAlive = tmuxSession ? checkTmuxSession(tmuxSession) : false;
-      const worktreePath =
-        task.worktree || (task.id ? join(WORKTREE_BASE, task.id) : undefined);
+      const worktreeDir = task.worktree || task.id;
+      const worktreePath = worktreeDir ? join(WORKTREE_BASE, worktreeDir) : undefined;
+
+      // Smart status inference
+      let inferredStatus = task.status || "unknown";
+      if (inferredStatus === "running" && !tmuxAlive) {
+        try {
+          const wtPath = typeof worktreePath === 'string' ? worktreePath : '';
+          if (wtPath && existsSync(wtPath)) {
+            const branchCommits = execGit(
+              "git log --oneline HEAD --not $(git merge-base HEAD main 2>/dev/null || echo HEAD~0) 2>/dev/null | wc -l",
+              wtPath
+            ).trim();
+            inferredStatus = parseInt(branchCommits) > 0 ? "completed" : "dead";
+          } else {
+            inferredStatus = "dead";
+          }
+        } catch {
+          inferredStatus = "dead";
+        }
+      }
+
+      // Get file stats
+      let liveFileCount = 0, liveAdditions = 0, liveDeletions = 0;
+      try {
+        const wtPath = typeof worktreePath === 'string' ? worktreePath : '';
+        if (wtPath && existsSync(wtPath)) {
+          const diffStat = execGit("git diff --stat HEAD~1..HEAD", wtPath);
+          const matchF = diffStat.match(/(\d+) files? changed/);
+          const matchA = diffStat.match(/(\d+) insertions?\(\+\)/);
+          const matchD = diffStat.match(/(\d+) deletions?\(-\)/);
+          if (matchF) liveFileCount = parseInt(matchF[1]);
+          if (matchA) liveAdditions = parseInt(matchA[1]);
+          if (matchD) liveDeletions = parseInt(matchD[1]);
+        }
+      } catch { /* ignore */ }
 
       return {
         ...task,
         tmuxAlive,
         worktreePath,
+        status: inferredStatus,
+        liveFileCount,
+        liveAdditions,
+        liveDeletions,
       };
     });
   } catch {

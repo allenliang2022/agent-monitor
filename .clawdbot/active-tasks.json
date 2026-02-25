@@ -1,1 +1,16 @@
-[]
+[
+  {
+    "id": "test-readme",
+    "tmuxSession": "agent-test-readme",
+    "agent": "opencode",
+    "description": "Improve README with project description and screenshots",
+    "repo": "agent-monitor",
+    "worktree": "test-readme",
+    "branch": "feat/test-readme",
+    "startedAt": 1772030454000,
+    "status": "running",
+    "retries": 0,
+    "maxRetries": 3,
+    "notifyOnComplete": true
+  }
+]

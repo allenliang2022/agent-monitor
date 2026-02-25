@@ -83,15 +83,65 @@ export async function GET() {
       const tmuxSession = task.tmuxSession || task.id || "";
       const tmuxAlive = tmuxSession ? checkTmuxSession(tmuxSession) : false;
 
-      // Determine worktree path: explicit worktree field, or derive from task id/branch
-      const worktreePath =
-        task.worktree ||
-        (task.id ? join(WORKTREE_BASE, task.id) : undefined);
+      // Determine worktree path: always build full path from WORKTREE_BASE
+      const worktreeDir = task.worktree || task.id;
+      const worktreePath = worktreeDir ? join(WORKTREE_BASE, worktreeDir) : undefined;
+
+      // Smart status inference based on tmux + git state
+      let inferredStatus = task.status || "unknown";
+      if (inferredStatus === "running" && !tmuxAlive) {
+        // Agent died - check if it committed (success) or just crashed
+        try {
+          const wtPath = typeof worktreePath === 'string' ? worktreePath : '';
+          if (wtPath && existsSync(wtPath)) {
+            const branchCommits = execSync(
+              `cd "${wtPath}" && git log --oneline HEAD --not $(git merge-base HEAD main) 2>/dev/null | wc -l`,
+              { encoding: "utf-8", timeout: 3000, stdio: "pipe" }
+            ).trim();
+            if (parseInt(branchCommits) > 0) {
+              inferredStatus = "completed";
+            } else {
+              inferredStatus = "dead";
+            }
+          } else {
+            inferredStatus = "dead";
+          }
+        } catch {
+          inferredStatus = "dead";
+        }
+      }
+
+      // Get file changes for this worktree
+      let fileCount = 0;
+      let additions = 0;
+      let deletions = 0;
+      try {
+        const wtPath = typeof worktreePath === 'string' ? worktreePath : '';
+        if (wtPath && existsSync(wtPath)) {
+          const diffStat = execSync(
+            `cd "${wtPath}" && git diff --stat HEAD~1..HEAD 2>/dev/null || echo ""`,
+            { encoding: "utf-8", timeout: 5000, stdio: "pipe" }
+          );
+          const lines = diffStat.trim().split("\n");
+          for (const line of lines) {
+            const match = line.match(/(\d+) insertions?\(\+\)/);
+            const match2 = line.match(/(\d+) deletions?\(-\)/);
+            const matchFiles = line.match(/(\d+) files? changed/);
+            if (matchFiles) fileCount = parseInt(matchFiles[1]);
+            if (match) additions = parseInt(match[1]);
+            if (match2) deletions = parseInt(match2[1]);
+          }
+        }
+      } catch { /* ignore */ }
 
       return {
         ...task,
         tmuxAlive,
         worktreePath,
+        status: inferredStatus,
+        liveFileCount: fileCount,
+        liveAdditions: additions,
+        liveDeletions: deletions,
       };
     });
 
