@@ -628,9 +628,7 @@ export default function LiveAgentsPage() {
             </span>
           </h1>
           <p className="text-sm text-slate-400 mt-1 font-mono">
-            {tasks.length} task{tasks.length !== 1 ? "s" : ""} tracked
-            {" | "}
-            {tasks.filter((t) => t.status === "running").length} running
+            {tasks.filter((t) => t.status === "running" || t.status === "pending").length} active agent{tasks.filter((t) => t.status === "running" || t.status === "pending").length !== 1 ? "s" : ""}
           </p>
         </div>
 
@@ -641,7 +639,7 @@ export default function LiveAgentsPage() {
       </motion.div>
 
       {/* ── Agent Cards Grid ─────────────────────────────────────────────── */}
-      {tasks.length === 0 ? (
+      {tasks.filter((t) => t.status === "running" || t.status === "pending").length === 0 ? (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -701,7 +699,7 @@ export default function LiveAgentsPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           <AnimatePresence>
-            {tasks.map((task) => (
+            {tasks.filter((t) => t.status === "running" || t.status === "pending").map((task) => (
               <AgentCard
                 key={task.id}
                 task={task}

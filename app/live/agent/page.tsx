@@ -109,10 +109,8 @@ export default function AgentPage() {
 
   const { lines, loading: logLoading, scrollRef } = useAgentLog(selectedTask?.id ?? null, isCompleted || false);
 
-  const recentCompleted = tasks
-    .filter((t) => t.status === "completed" || t.status === "done")
-    .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())
-    .slice(0, 5);
+  // Only show running/pending tasks
+  const activeTasks = tasks.filter((t) => t.status === "running" || t.status === "pending");
 
   // ── No tasks at all: empty state ──────────────────────────────────────
   if (tasks.length === 0) {
@@ -402,64 +400,6 @@ export default function AgentPage() {
         </div>
       </motion.section>
 
-      {/* ── Recent Completed ─────────────────────────────────────────────── */}
-      <motion.section
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
-      >
-        <h2 className="text-sm font-mono text-green-400 mb-3 flex items-center gap-2">
-          <span className="text-green-400/50">&gt;</span> Recent Completed
-          <span className="text-[10px] font-mono text-slate-600">
-            ({recentCompleted.length})
-          </span>
-        </h2>
-        {recentCompleted.length === 0 ? (
-          <div className="bg-slate-900/40 border border-slate-800/50 rounded-lg p-4 text-center text-slate-600 text-xs font-mono">
-            No completed tasks yet.
-          </div>
-        ) : (
-          <div className="space-y-2">
-            <AnimatePresence>
-              {recentCompleted.map((task, i) => (
-                <motion.div
-                  key={task.id}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.05 }}
-                  className="bg-slate-900/40 border border-green-500/10 rounded-lg p-3 cursor-pointer hover:border-green-500/30 transition-colors"
-                  onClick={() => setSelectedTaskId(task.id)}
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="font-mono text-xs text-green-400">
-                      {task.name || task.id}
-                    </span>
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full border bg-green-500/10 text-green-400 border-green-500/20">
-                      DONE
-                    </span>
-                  </div>
-                  <div className="flex flex-wrap gap-4 text-[10px] font-mono text-slate-500">
-                    {task.branch && <span className="text-amber-400/70">{task.branch}</span>}
-                    {task.commit && (
-                      <span>
-                        commit: <span className="text-amber-400">{task.commit}</span>
-                      </span>
-                    )}
-                    {task.filesChanged !== undefined && (
-                      <span>{task.filesChanged} files</span>
-                    )}
-                    {task.summary && (
-                      <span className="truncate max-w-[350px]">
-                        {task.summary}
-                      </span>
-                    )}
-                  </div>
-                </motion.div>
-              ))}
-            </AnimatePresence>
-          </div>
-        )}
-      </motion.section>
     </div>
   );
 }

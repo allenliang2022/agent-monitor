@@ -494,7 +494,7 @@ export default function TasksPage() {
         className="flex flex-wrap items-center gap-4 text-xs font-mono"
       >
         <span className="text-slate-500">
-          Total: <span className="text-slate-300">{tasks.length}</span>
+          Total: <span className="text-slate-300">{running.length + pending.length}</span>
         </span>
         <span className="text-slate-500">
           Running:{" "}
@@ -503,18 +503,6 @@ export default function TasksPage() {
         <span className="text-slate-500">
           Pending:{" "}
           <span className="text-amber-400">{pending.length}</span>
-        </span>
-        <span className="text-slate-500">
-          Completed:{" "}
-          <span className="text-green-400">
-            {history.filter((t) => t.status === "completed").length}
-          </span>
-        </span>
-        <span className="text-slate-500">
-          Failed:{" "}
-          <span className="text-red-400">
-            {history.filter((t) => t.status === "failed").length}
-          </span>
         </span>
 
         {/* Spawn Button */}
@@ -585,34 +573,6 @@ export default function TasksPage() {
           </div>
         </motion.section>
       )}
-
-      {/* ── Task History ─────────────────────────────────────────────────── */}
-      <motion.section
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
-      >
-        <h2 className="text-sm font-mono text-green-400 mb-3 flex items-center gap-2">
-          <span className="text-green-400/50">&gt;</span> Completed
-          <span className="text-[10px] font-mono text-slate-600">
-            ({history.length})
-          </span>
-        </h2>
-
-        {history.length === 0 ? (
-          <div className="bg-slate-900/40 border border-slate-800/50 rounded-lg p-6 text-center text-slate-500 text-sm font-mono">
-            No completed tasks yet.
-          </div>
-        ) : (
-          <div className="space-y-3">
-            <AnimatePresence mode="popLayout">
-              {history.map((task, i) => (
-                <TaskCard key={task.id} task={task} index={i} />
-              ))}
-            </AnimatePresence>
-          </div>
-        )}
-      </motion.section>
 
       {/* ── Spawn Task Modal ─────────────────────────────────────────────── */}
       <SpawnTaskModal open={spawnOpen} onClose={() => setSpawnOpen(false)} onSuccess={handleSpawnSuccess} />
