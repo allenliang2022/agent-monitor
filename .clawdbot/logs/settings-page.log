@@ -1,0 +1,444 @@
+[0m
+> build · claude-opus-4.6
+[0m
+[0m# [0mTodos
+[ ] Explore codebase structure (navbar, live context, existing pages)
+[ ] Create SettingsContext (app/live/SettingsContext.tsx)
+[ ] Create Settings page (app/live/settings/page.tsx)
+[ ] Add Settings link to Navbar
+[ ] Apply polling interval from SettingsContext in LiveContext.tsx
+[ ] Run npm run build to verify
+[0m
+I'll start by exploring the codebase to understand the current structure, then implement all three tasks.
+[0m
+[0m• [0mExplore codebase structure[90m Explore Agent[0m
+[0m✓ [0mExplore codebase structure[90m Explore Agent[0m
+[0m
+[0m# [0mTodos
+[x] Explore codebase structure (navbar, live context, existing pages)
+[ ] Create SettingsContext (app/live/SettingsContext.tsx)
+[ ] Create Settings page (app/live/settings/page.tsx)
+[ ] Add Settings link to Navbar
+[ ] Apply polling interval from SettingsContext in LiveContext.tsx
+[ ] Run npm run build to verify
+[0m
+Excellent. I have a thorough understanding of the codebase. Let me now implement all three tasks.
+[0m
+[0m→ [0mRead app/live/layout.tsx
+[0m
+Now I need to check the live layout to understand how to wrap the SettingsProvider, and also check the root layout for the proper wrapping order.
+[0m
+[0m→ [0mRead app/layout.tsx
+[0m
+Good. The SettingsContext should wrap at the root layout level (since Navbar needs to potentially read settings too, and LiveContext needs to read from it). But since root layout is a server component, I'll need to create a client wrapper. Actually, the simpler approach: place `SettingsProvider` in the `app/live/layout.tsx` wrapping `LiveProvider`, since the settings are consumed within the `/live` route tree. The Navbar doesn't need to read settings - it just links to the settings page.
+
+Wait - LiveContext needs to read polling interval from SettingsContext. So SettingsProvider must wrap LiveProvider. Let me create the files now.
+[0m
+[0m← [0mWrite app/live/SettingsContext.tsx
+Wrote file successfully.
+[0m
+[0m# [0mTodos
+[x] Explore codebase structure (navbar, live context, existing pages)
+[x] Create SettingsContext (app/live/SettingsContext.tsx)
+[ ] Create Settings page (app/live/settings/page.tsx)
+[ ] Add Settings link to Navbar
+[ ] Apply polling interval from SettingsContext in LiveContext.tsx
+[ ] Wrap LiveProvider with SettingsProvider in live/layout.tsx
+[ ] Run npm run build to verify
+[0m
+Now let me create the Settings page. Let me first check an existing page to match the style patterns:
+[0m
+[0m→ [0mRead app/live/page.tsx
+[0m
+Good, I now have a clear picture of the styling patterns. Let me create the Settings page:
+[0m
+[0m$ [0mmkdir -p app/live/settings
+[0m
+[0m← [0mWrite app/live/settings/page.tsx
+Wrote file successfully.
+[0m
+[0m# [0mTodos
+[x] Explore codebase structure (navbar, live context, existing pages)
+[x] Create SettingsContext (app/live/SettingsContext.tsx)
+[x] Create Settings page (app/live/settings/page.tsx)
+[ ] Add Settings link to Navbar
+[ ] Apply polling interval from SettingsContext in LiveContext.tsx
+[ ] Wrap LiveProvider with SettingsProvider in live/layout.tsx
+[ ] Run npm run build to verify
+[0m
+Now let me add the Settings gear icon to the Navbar:
+[0m
+[0m→ [0mRead app/components/Navbar.tsx
+[0m
+I need to add a Settings gear icon after the nav items in the desktop view, and a Settings link at the end of the mobile menu. Let me add it as a separate element (not part of `navItems`) so the gear icon stands out:
+[0m
+[0m← [0mEdit app/components/Navbar.tsx
+Index: /Users/liang/work/agent-monitor-worktrees/settings-page/app/components/Navbar.tsx
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/settings-page/app/components/Navbar.tsx
++++ /Users/liang/work/agent-monitor-worktrees/settings-page/app/components/Navbar.tsx
+@@ -79,8 +79,25 @@
+     );
+   })}
+ </div>
+ 
++{/* Settings gear icon (desktop) */}
++<Link
++  href="/live/settings"
++  aria-current={pathname === "/live/settings" ? "page" : undefined}
++  aria-label="Settings"
++  className={`hidden md:flex shrink-0 ml-2 p-1.5 rounded-md transition-colors ${
++    pathname === "/live/settings"
++      ? "text-cyan-400 bg-cyan-400/15"
++      : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
++  }`}
++>
++  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
++    <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
++    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
++  </svg>
++</Link>
++
+ {/* Mobile hamburger button */}
+ <button
+   onClick={() => setMobileOpen(!mobileOpen)}
+   className="md:hidden ml-auto p-2 rounded-md text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 transition-colors"
+
+[0m
+Now add Settings to the mobile menu. I need to add it after the navItems loop in the mobile dropdown:
+[0m
+[0m← [0mEdit app/components/Navbar.tsx
+Index: /Users/liang/work/agent-monitor-worktrees/settings-page/app/components/Navbar.tsx
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/settings-page/app/components/Navbar.tsx
++++ /Users/liang/work/agent-monitor-worktrees/settings-page/app/components/Navbar.tsx
+@@ -161,8 +161,21 @@
+               {item.label}
+             </Link>
+           );
+         })}
++        {/* Settings link */}
++        <Link
++          href="/live/settings"
++          aria-current={pathname === "/live/settings" ? "page" : undefined}
++          className={`block px-3 py-2 rounded-md text-sm font-mono transition-colors ${
++            pathname === "/live/settings"
++              ? "text-white bg-cyan-400/15 border border-cyan-400/30"
++              : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
++          }`}
++        >
++          <span className="text-cyan-400/60 mr-2">*</span>
++          Settings
++        </Link>
+       </div>
+     </motion.div>
+   )}
+ </AnimatePresence>
+
+[0m
+[0m# [0mTodos
+[x] Explore codebase structure (navbar, live context, existing pages)
+[x] Create SettingsContext (app/live/SettingsContext.tsx)
+[x] Create Settings page (app/live/settings/page.tsx)
+[x] Add Settings link to Navbar
+[ ] Apply polling interval from SettingsContext in LiveContext.tsx
+[ ] Wrap LiveProvider with SettingsProvider in live/layout.tsx
+[ ] Run npm run build to verify
+[0m
+Now I need to modify LiveContext.tsx to read the polling interval from SettingsContext. The key places to update are:
+1. The `fetchTasks` polling interval (currently hardcoded to `5000`)
+2. The git polling interval (currently hardcoded to `5000`) 
+3. The SSE reconnect timeout (currently hardcoded to `3000`)
+[0m
+[0m→ [0mRead app/live/LiveContext.tsx
+[0m
+Now I'll update LiveContext.tsx to import and use the polling interval from SettingsContext:
+[0m
+[0m← [0mEdit app/live/LiveContext.tsx
+Index: /Users/liang/work/agent-monitor-worktrees/settings-page/app/live/LiveContext.tsx
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/settings-page/app/live/LiveContext.tsx
++++ /Users/liang/work/agent-monitor-worktrees/settings-page/app/live/LiveContext.tsx
+@@ -8,8 +8,9 @@
+   useRef,
+   useCallback,
+   type ReactNode,
+ } from "react";
++import { useSettings } from "./SettingsContext";
+ 
+ // ─── Types ──────────────────────────────────────────────────────────────────
+ 
+ export interface AgentTask {
+
+[0m
+Now add the `pollingInterval` reading inside `LiveProvider`:
+[0m
+[0m← [0mEdit app/live/LiveContext.tsx
+Index: /Users/liang/work/agent-monitor-worktrees/settings-page/app/live/LiveContext.tsx
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/settings-page/app/live/LiveContext.tsx
++++ /Users/liang/work/agent-monitor-worktrees/settings-page/app/live/LiveContext.tsx
+@@ -147,8 +147,11 @@
+ 
+ // ─── Provider ───────────────────────────────────────────────────────────────
+ 
+ export function LiveProvider({ children }: { children: ReactNode }) {
++  const { settings } = useSettings();
++  const pollingMs = settings.pollingInterval * 1000;
++
+   const [connected, setConnected] = useState(false);
+   const [initialLoading, setInitialLoading] = useState(true);
+   const [tasks, setTasks] = useState<AgentTask[]>([]);
+   const [fileChanges, setFileChanges] = useState<Record<string, FileChangesResult>>({});
+
+[0m
+Now replace the hardcoded `5000` intervals with `pollingMs`:
+[0m
+[0m← [0mEdit app/live/LiveContext.tsx
+Index: /Users/liang/work/agent-monitor-worktrees/settings-page/app/live/LiveContext.tsx
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/settings-page/app/live/LiveContext.tsx
++++ /Users/liang/work/agent-monitor-worktrees/settings-page/app/live/LiveContext.tsx
+@@ -196,11 +196,11 @@
+ }, []);
+ 
+ useEffect(() => {
+   fetchTasks();
+-  const interval = setInterval(fetchTasks, 5000);
++  const interval = setInterval(fetchTasks, pollingMs);
+   return () => clearInterval(interval);
+-}, [fetchTasks]);
++}, [fetchTasks, pollingMs]);
+ 
+ // ── Auto-populate git dirs from active tasks ───────────────────────────
+ 
+ useEffect(() => {
+
+[0m
+[0m← [0mEdit app/live/LiveContext.tsx
+Index: /Users/liang/work/agent-monitor-worktrees/settings-page/app/live/LiveContext.tsx
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/settings-page/app/live/LiveContext.tsx
++++ /Users/liang/work/agent-monitor-worktrees/settings-page/app/live/LiveContext.tsx
+@@ -242,11 +242,11 @@
+   if (gitDirs.length === 0) return;
+   gitDirs.forEach((d) => fetchGit(d));
+   const interval = setInterval(() => {
+     gitDirs.forEach((d) => fetchGit(d));
+-  }, 5000);
++  }, pollingMs);
+   return () => clearInterval(interval);
+-}, [gitDirs, fetchGit]);
++}, [gitDirs, fetchGit, pollingMs]);
+ 
+ // ── SSE connection ────────────────────────────────────────────────────
+ 
+ useEffect(() => {
+
+[0m
+Now replace the SSE reconnect timeout with `pollingMs`:
+[0m
+[0m← [0mEdit app/live/LiveContext.tsx
+Index: /Users/liang/work/agent-monitor-worktrees/settings-page/app/live/LiveContext.tsx
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/settings-page/app/live/LiveContext.tsx
++++ /Users/liang/work/agent-monitor-worktrees/settings-page/app/live/LiveContext.tsx
+@@ -311,9 +311,9 @@
+   es.onerror = () => {
+     setConnected(false);
+     addLog("system", "Disconnected — reconnecting...");
+     es?.close();
+-    reconnectTimer = setTimeout(connect, 3000);
++    reconnectTimer = setTimeout(connect, pollingMs);
+   };
+ };
+ 
+ connect();
+
+[0m
+Now I need to add `pollingMs` to the SSE effect dependency array. Let me find and update it:
+[0m
+[0m← [0mEdit app/live/LiveContext.tsx
+Index: /Users/liang/work/agent-monitor-worktrees/settings-page/app/live/LiveContext.tsx
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/settings-page/app/live/LiveContext.tsx
++++ /Users/liang/work/agent-monitor-worktrees/settings-page/app/live/LiveContext.tsx
+@@ -321,9 +321,9 @@
+   return () => {
+     es?.close();
+     clearTimeout(reconnectTimer);
+   };
+-}, [addLog]);
++}, [addLog, pollingMs]);
+ 
+ // ── Auto-scroll log ─────────────────────────────────────────────────────
+ 
+ useEffect(() => {
+
+[0m
+[0m# [0mTodos
+[x] Explore codebase structure (navbar, live context, existing pages)
+[x] Create SettingsContext (app/live/SettingsContext.tsx)
+[x] Create Settings page (app/live/settings/page.tsx)
+[x] Add Settings link to Navbar
+[x] Apply polling interval from SettingsContext in LiveContext.tsx
+[ ] Wrap LiveProvider with SettingsProvider in live/layout.tsx
+[ ] Run npm run build to verify
+[0m
+Now wrap `LiveProvider` with `SettingsProvider` in the live layout:
+[0m
+[0m← [0mEdit app/live/layout.tsx
+Index: /Users/liang/work/agent-monitor-worktrees/settings-page/app/live/layout.tsx
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/settings-page/app/live/layout.tsx
++++ /Users/liang/work/agent-monitor-worktrees/settings-page/app/live/layout.tsx
+@@ -1,27 +1,30 @@
+ "use client";
+ 
+ import { usePathname } from "next/navigation";
+ import { motion, AnimatePresence } from "framer-motion";
++import { SettingsProvider } from "./SettingsContext";
+ import { LiveProvider } from "./LiveContext";
+ 
+ export default function LiveLayout({ children }: { children: React.ReactNode }) {
+   const pathname = usePathname();
+ 
+   return (
+-    <LiveProvider>
+-      <div className="min-h-screen bg-gradient-to-b from-[#0a0a1a] to-[#111128] text-slate-200 pt-14">
+-        <AnimatePresence mode="wait">
+-          <motion.div
+-            key={pathname}
+-            initial={{ opacity: 0, y: 8 }}
+-            animate={{ opacity: 1, y: 0 }}
+-            exit={{ opacity: 0, y: -8 }}
+-            transition={{ duration: 0.25, ease: "easeInOut" }}
+-          >
+-            {children}
+-          </motion.div>
+-        </AnimatePresence>
+-      </div>
+-    </LiveProvider>
++    <SettingsProvider>
++      <LiveProvider>
++        <div className="min-h-screen bg-gradient-to-b from-[#0a0a1a] to-[#111128] text-slate-200 pt-14">
++          <AnimatePresence mode="wait">
++            <motion.div
++              key={pathname}
++              initial={{ opacity: 0, y: 8 }}
++              animate={{ opacity: 1, y: 0 }}
++              exit={{ opacity: 0, y: -8 }}
++              transition={{ duration: 0.25, ease: "easeInOut" }}
++            >
++              {children}
++            </motion.div>
++          </AnimatePresence>
++        </div>
++      </LiveProvider>
++    </SettingsProvider>
+   );
+ }
+
+[0m
+[0m# [0mTodos
+[x] Explore codebase structure (navbar, live context, existing pages)
+[x] Create SettingsContext (app/live/SettingsContext.tsx)
+[x] Create Settings page (app/live/settings/page.tsx)
+[x] Add Settings link to Navbar
+[x] Apply polling interval from SettingsContext in LiveContext.tsx
+[x] Wrap LiveProvider with SettingsProvider in live/layout.tsx
+[ ] Run npm run build to verify
+[0m
+[0m$ [0mnpm run build 2>&1
+> agent-monitor@0.1.0 build
+> next build
+
+▲ Next.js 16.1.6 (Turbopack)
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 2.2s
+  Running TypeScript ...
+  Collecting page data using 9 workers ...
+  Generating static pages using 9 workers (0/15) ...
+  Generating static pages using 9 workers (3/15) 
+  Generating static pages using 9 workers (7/15) 
+  Generating static pages using 9 workers (11/15) 
+✓ Generating static pages using 9 workers (15/15) in 134.4ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ƒ /api/agent-log
+├ ƒ /api/agent-tasks
+├ ƒ /api/config
+├ ƒ /api/events
+├ ƒ /api/file-changes
+├ ƒ /api/git
+├ ƒ /api/git-diff
+├ ƒ /api/health
+├ ƒ /api/prompts
+├ ƒ /api/sessions
+├ ƒ /api/spawn-task
+├ ○ /live
+├ ○ /live/agent
+├ ○ /live/agents
+├ ○ /live/architecture
+├ ○ /live/files
+├ ○ /live/git
+├ ○ /live/monitoring
+├ ○ /live/prompt
+├ ○ /live/settings
+├ ○ /live/tasks
+└ ○ /live/timeline
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+[0m
+Build succeeds with no errors. The `/live/settings` route is properly listed.
+[0m
+[0m# [0mTodos
+[x] Explore codebase structure (navbar, live context, existing pages)
+[x] Create SettingsContext (app/live/SettingsContext.tsx)
+[x] Create Settings page (app/live/settings/page.tsx)
+[x] Add Settings link to Navbar
+[x] Apply polling interval from SettingsContext in LiveContext.tsx
+[x] Wrap LiveProvider with SettingsProvider in live/layout.tsx
+[x] Run npm run build to verify
+[0m
+All tasks complete. Here's a summary of what was implemented:
+
+## Changes Made
+
+### Task 1: Settings Page + Context
+
+**`app/live/SettingsContext.tsx`** (new) - Settings context provider with:
+- All settings types with defaults (polling interval 3s, max timeline events 50, etc.)
+- `useSettings()` hook exposing `settings`, `updateSetting`, `resetSettings`
+- localStorage persistence with hydration on mount
+- Wrapped in `app/live/layout.tsx` as the outermost provider (above `LiveProvider`)
+
+**`app/live/settings/page.tsx`** (new) - Full settings page with 4 sections:
+- **General** - Dashboard title input, theme selector (dark active, light/auto disabled), polling interval slider (1-30s), max timeline events slider (10-200)
+- **Agent Configuration** - Default agent type dropdown (opencode), branch prefix input, read-only worktree path, auto-cleanup toggle
+- **Notifications** - Browser notifications, sound on completion, and toast notifications toggles
+- **About** - Version (v0.1.0), GitHub repo link, session stats grid (tasks/commits/files)
+
+### Task 2: Navbar Settings Link
+
+**`app/components/Navbar.tsx`** (modified) - Added:
+- Desktop: gear icon button after nav items with active state highlighting
+- Mobile: "Settings" link at bottom of mobile dropdown menu
+
+### Task 3: Polling Interval Integration
+
+**`app/live/LiveContext.tsx`** (modified) - Reads `pollingInterval` from `useSettings()`:
+- Task polling interval: `pollingMs` (was hardcoded 5000ms)
+- Git polling interval: `pollingMs` (was hardcoded 5000ms)
+- SSE reconnect delay: `pollingMs` (was hardcoded 3000ms)
+
+**`app/live/layout.tsx`** (modified) - `SettingsProvider` wraps `LiveProvider` so LiveContext can read settings.
+
+Build passes cleanly with the new `/live/settings` route confirmed in the output.
+[0m

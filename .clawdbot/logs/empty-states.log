@@ -1,0 +1,941 @@
+[0m
+> build · claude-opus-4.6
+[0m
+[0m• [0mExplore codebase structure[90m Explore Agent[0m
+[0m
+I'll start by exploring the codebase structure to understand the current state of things before planning the implementation.
+[0m
+[0m✓ [0mExplore codebase structure[90m Explore Agent[0m
+[0m→ [0mRead app/live/page.tsx
+[0m→ [0mRead app/live/agents/page.tsx
+[0m→ [0mRead app/live/agent/page.tsx
+[0m→ [0mRead package.json
+[0m
+Now let me read the key files I need to modify directly.
+[0m
+[0m✱ [0mGlob "app/live/**/loading.tsx"[90m 0 matches[0m
+[0m✱ [0mGlob "app/live/**/page.tsx"[90m 10 matches[0m
+[0m
+Now let me also check for existing loading patterns and the other pages that need loading skeletons.
+[0m
+[0m→ [0mRead app/live
+[0m→ [0mRead app/live/LiveContext.tsx
+[0m→ [0mRead app/live/tasks/page.tsx
+[0m→ [0mRead app/live/git/page.tsx
+[0m
+Let me read the LiveContext and other pages that need loading states:
+[0m
+[0m→ [0mRead app/live/files/page.tsx
+[0m
+[0m# [0mTodos
+[ ] Task 1: Overview empty state (app/live/page.tsx) - animated terminal icon, heading, subtext, New Task button, pulsing animation
+[ ] Task 2: Agents page empty state (app/live/agents/page.tsx) - robot icon, heading, subtext
+[ ] Task 3: Create shared LoadingSkeleton component at app/live/components/LoadingSkeleton.tsx
+[ ] Task 3b: Add loading skeletons to agents, tasks, git, files pages
+[ ] Task 4: Agent page task selector (app/live/agent/page.tsx) - dropdown for completed tasks when none active
+[ ] Run npm run build to verify everything compiles
+[0m
+Now I have a thorough understanding of the codebase. Let me plan and execute the tasks.
+[0m
+[0m# [0mTodos
+[ ] Task 1: Overview empty state (app/live/page.tsx) - animated terminal icon, heading, subtext, New Task button, pulsing animation
+[ ] Task 2: Agents page empty state (app/live/agents/page.tsx) - robot icon, heading, subtext
+[ ] Task 3: Create shared LoadingSkeleton component at app/live/components/LoadingSkeleton.tsx
+[ ] Task 3b: Add loading skeletons to agents, tasks, git, files pages
+[ ] Task 4: Agent page task selector (app/live/agent/page.tsx) - dropdown for completed tasks when none active
+[ ] Run npm run build to verify everything compiles
+[0m
+Starting with Task 1: Overview empty state. When `totalTasks === 0`, the Event Log area should show a polished empty state.
+[0m
+[0m← [0mEdit app/live/page.tsx
+Index: /Users/liang/work/agent-monitor-worktrees/empty-states/app/live/page.tsx
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/empty-states/app/live/page.tsx
++++ /Users/liang/work/agent-monitor-worktrees/empty-states/app/live/page.tsx
+@@ -475,44 +475,115 @@
+ >
+   <h2 className="text-sm font-mono text-emerald-400 mb-3 flex items-center gap-2">
+     <span className="text-emerald-400/50">&gt;</span> Event Log
+   </h2>
+-  <div className="bg-slate-900/50 border border-slate-700 rounded-lg p-3 h-64 overflow-y-auto font-mono text-[11px]">
+-    {eventLog.length === 0 && (
+-      <p className="text-slate-400">Waiting for events...</p>
+-    )}
+-    <AnimatePresence>
+-      {eventLog.map((entry) => (
++
++  {totalTasks === 0 && eventLog.length === 0 ? (
++    /* ── Empty State ─────────────────────────────────────────────── */
++    <div className="relative bg-slate-900/50 border border-slate-700 rounded-xl p-10 flex flex-col items-center justify-center text-center overflow-hidden">
++      {/* Subtle pulsing background glow */}
++      <motion.div
++        animate={{ opacity: [0.03, 0.08, 0.03] }}
++        transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
++        className="absolute inset-0 bg-gradient-to-br from-cyan-400/10 via-transparent to-purple-500/10 pointer-events-none"
++      />
++
++      {/* Animated terminal icon */}
++      <motion.div
++        initial={{ scale: 0.8, opacity: 0 }}
++        animate={{ scale: 1, opacity: 1 }}
++        transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
++        className="relative mb-6"
++      >
+         <motion.div
+-          key={entry.id}
+-          initial={{ opacity: 0, y: 5 }}
+-          animate={{ opacity: 1, y: 0 }}
+-          className="flex gap-3 py-0.5"
++          animate={{ y: [0, -4, 0] }}
++          transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+         >
+-          <span className="text-slate-400 shrink-0">
+-            {new Date(entry.timestamp).toLocaleTimeString()}
+-          </span>
+-          <span
+-            className={`shrink-0 w-16 ${
+-              entry.type === "error" || entry.type === "git-error"
+-                ? "text-red-400"
+-                : entry.type === "system"
+-                  ? "text-amber-400"
+-                  : entry.type === "agent"
+-                    ? "text-cyan-400"
+-                    : entry.type === "git"
+-                      ? "text-purple-500"
+-                      : "text-slate-400"
+-            }`}
+-          >
+-            [{entry.type}]
+-          </span>
+-          <span className="text-slate-300">{entry.message}</span>
++          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-cyan-400/15 to-purple-500/15 border border-cyan-400/20 flex items-center justify-center">
++            <svg className="w-8 h-8 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
++              <path strokeLinecap="round" strokeLinejoin="round" d="m6.75 7.5 3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0 0 21 18V6a2.25 2.25 0 0 0-2.25-2.25H5.25A2.25 2.25 0 0 0 3 6v12a2.25 2.25 0 0 0 2.25 2.25Z" />
++            </svg>
++          </div>
+         </motion.div>
+-      ))}
+-    </AnimatePresence>
+-    <div ref={logEndRef} />
+-  </div>
++        {/* Pulse ring */}
++        <motion.div
++          animate={{ scale: [1, 1.4, 1], opacity: [0.3, 0, 0.3] }}
++          transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
++          className="absolute inset-0 rounded-2xl border border-cyan-400/20"
++        />
++      </motion.div>
++
++      <motion.h3
++        initial={{ opacity: 0, y: 8 }}
++        animate={{ opacity: 1, y: 0 }}
++        transition={{ delay: 0.35 }}
++        className="text-lg font-semibold text-slate-200 mb-2"
++      >
++        Ready to orchestrate
++      </motion.h3>
++
++      <motion.p
++        initial={{ opacity: 0, y: 8 }}
++        animate={{ opacity: 1, y: 0 }}
++        transition={{ delay: 0.45 }}
++        className="text-sm font-mono text-slate-400 mb-6 max-w-sm"
++      >
++        Spawn your first agent task to see the dashboard come alive
++      </motion.p>
++
++      <motion.div
++        initial={{ opacity: 0, y: 8 }}
++        animate={{ opacity: 1, y: 0 }}
++        transition={{ delay: 0.55 }}
++      >
++        <Link
++          href="/live/tasks"
++          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-500/25 hover:border-cyan-500/50 transition-all font-mono text-sm font-semibold group"
++        >
++          <span className="text-base leading-none group-hover:scale-110 transition-transform">+</span>
++          New Task
++        </Link>
++      </motion.div>
++    </div>
++  ) : (
++    /* ── Normal Event Log ────────────────────────────────────────── */
++    <div className="bg-slate-900/50 border border-slate-700 rounded-lg p-3 h-64 overflow-y-auto font-mono text-[11px]">
++      {eventLog.length === 0 && (
++        <p className="text-slate-400">Waiting for events...</p>
++      )}
++      <AnimatePresence>
++        {eventLog.map((entry) => (
++          <motion.div
++            key={entry.id}
++            initial={{ opacity: 0, y: 5 }}
++            animate={{ opacity: 1, y: 0 }}
++            className="flex gap-3 py-0.5"
++          >
++            <span className="text-slate-400 shrink-0">
++              {new Date(entry.timestamp).toLocaleTimeString()}
++            </span>
++            <span
++              className={`shrink-0 w-16 ${
++                entry.type === "error" || entry.type === "git-error"
++                  ? "text-red-400"
++                  : entry.type === "system"
++                    ? "text-amber-400"
++                    : entry.type === "agent"
++                      ? "text-cyan-400"
++                      : entry.type === "git"
++                        ? "text-purple-500"
++                        : "text-slate-400"
++              }`}
++            >
++              [{entry.type}]
++            </span>
++            <span className="text-slate-300">{entry.message}</span>
++          </motion.div>
++        ))}
++      </AnimatePresence>
++      <div ref={logEndRef} />
++    </div>
++  )}
+ </motion.section>
+ 
+ {/* ── Navigation Cards ─────────────────────────────────────────────── */}
+ <motion.section
+
+[0m
+[0m# [0mTodos
+[x] Task 1: Overview empty state (app/live/page.tsx) - animated terminal icon, heading, subtext, New Task button, pulsing animation
+[ ] Task 2: Agents page empty state (app/live/agents/page.tsx) - robot icon, heading, subtext
+[ ] Task 3: Create shared LoadingSkeleton component at app/live/components/LoadingSkeleton.tsx
+[ ] Task 3b: Add loading skeletons to agents, tasks, git, files pages
+[ ] Task 4: Agent page task selector (app/live/agent/page.tsx) - dropdown for completed tasks when none active
+[ ] Run npm run build to verify everything compiles
+[0m
+I also need to make sure `totalTasks` is available in the section. Let me verify the variable exists in the component scope - yes, it's already defined on line 237. Good.
+[0m
+Now Task 2: Replace the agents page empty state with a polished version with robot icon.
+[0m
+[0m← [0mEdit app/live/agents/page.tsx
+Index: /Users/liang/work/agent-monitor-worktrees/empty-states/app/live/agents/page.tsx
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/empty-states/app/live/agents/page.tsx
++++ /Users/liang/work/agent-monitor-worktrees/empty-states/app/live/agents/page.tsx
+@@ -625,18 +625,62 @@
+ 
+ {/* ── Agent Cards Grid ─────────────────────────────────────────────── */}
+ {tasks.length === 0 ? (
+   <motion.div
+-    initial={{ opacity: 0 }}
+-    animate={{ opacity: 1 }}
+-    className="bg-slate-900/50 border border-slate-700 rounded-xl p-12 text-center"
++    initial={{ opacity: 0, y: 20 }}
++    animate={{ opacity: 1, y: 0 }}
++    transition={{ duration: 0.5 }}
++    className="relative bg-slate-900/50 border border-slate-700 rounded-xl p-16 flex flex-col items-center justify-center text-center overflow-hidden"
+   >
+-    <div className="text-slate-300 font-mono text-sm mb-2">
+-      No active agents.
+-    </div>
+-    <div className="text-slate-400 font-mono text-xs">
+-      Spawn one to get started.
+-    </div>
++    {/* Subtle animated background */}
++    <motion.div
++      animate={{ opacity: [0.02, 0.06, 0.02] }}
++      transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
++      className="absolute inset-0 bg-gradient-to-br from-purple-500/10 via-transparent to-cyan-400/10 pointer-events-none"
++    />
++
++    {/* Animated robot icon */}
++    <motion.div
++      initial={{ scale: 0.8, opacity: 0 }}
++      animate={{ scale: 1, opacity: 1 }}
++      transition={{ delay: 0.15, type: "spring", stiffness: 200 }}
++      className="relative mb-6"
++    >
++      <motion.div
++        animate={{ y: [0, -3, 0] }}
++        transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut" }}
++      >
++        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500/15 to-cyan-400/15 border border-purple-500/20 flex items-center justify-center">
++          <svg className="w-8 h-8 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
++            <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 3v1.5M4.5 8.25H3m18 0h-1.5M4.5 12H3m18 0h-1.5m-15 3.75H3m18 0h-1.5M8.25 19.5V21M12 3v1.5m3.75-1.5v1.5m-7.5 15V21M12 19.5V21m3.75-1.5V21m-9-16.5h10.5a2.25 2.25 0 0 1 2.25 2.25v7.5a2.25 2.25 0 0 1-2.25 2.25H6.75a2.25 2.25 0 0 1-2.25-2.25v-7.5A2.25 2.25 0 0 1 6.75 4.5ZM9 10.5a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Zm6 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z" />
++          </svg>
++        </div>
++      </motion.div>
++      {/* Pulse ring */}
++      <motion.div
++        animate={{ scale: [1, 1.4, 1], opacity: [0.3, 0, 0.3] }}
++        transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut" }}
++        className="absolute inset-0 rounded-2xl border border-purple-500/20"
++      />
++    </motion.div>
++
++    <motion.h3
++      initial={{ opacity: 0, y: 8 }}
++      animate={{ opacity: 1, y: 0 }}
++      transition={{ delay: 0.3 }}
++      className="text-lg font-semibold text-slate-200 mb-2"
++    >
++      No agents running
++    </motion.h3>
++
++    <motion.p
++      initial={{ opacity: 0, y: 8 }}
++      animate={{ opacity: 1, y: 0 }}
++      transition={{ delay: 0.4 }}
++      className="text-sm font-mono text-slate-400 max-w-xs"
++    >
++      Start a task to see agents appear here
++    </motion.p>
+   </motion.div>
+ ) : (
+   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+     <AnimatePresence>
+
+[0m
+[0m# [0mTodos
+[x] Task 1: Overview empty state (app/live/page.tsx) - animated terminal icon, heading, subtext, New Task button, pulsing animation
+[x] Task 2: Agents page empty state (app/live/agents/page.tsx) - robot icon, heading, subtext
+[ ] Task 3: Create shared LoadingSkeleton component at app/live/components/LoadingSkeleton.tsx
+[ ] Task 3b: Add loading skeletons to agents, tasks, git, files pages
+[ ] Task 4: Agent page task selector (app/live/agent/page.tsx) - dropdown for completed tasks when none active
+[ ] Run npm run build to verify everything compiles
+[0m
+Now Task 3: Create the shared LoadingSkeleton component. First, I need to create the components directory.
+[0m
+[0m$ [0mmkdir -p app/live/components
+[0m
+[0m← [0mWrite app/live/components/LoadingSkeleton.tsx
+Wrote file successfully.
+[0m
+[0m# [0mTodos
+[x] Task 1: Overview empty state (app/live/page.tsx) - animated terminal icon, heading, subtext, New Task button, pulsing animation
+[x] Task 2: Agents page empty state (app/live/agents/page.tsx) - robot icon, heading, subtext
+[x] Task 3: Create shared LoadingSkeleton component at app/live/components/LoadingSkeleton.tsx
+[ ] Task 3b: Add loading skeletons to agents, tasks, git, files pages
+[ ] Task 4: Agent page task selector (app/live/agent/page.tsx) - dropdown for completed tasks when none active
+[ ] Run npm run build to verify everything compiles
+[0m
+Now Task 3b: Add loading skeletons to all four pages. I need to add a loading state to the LiveContext first so pages know when data has initially loaded. Let me check how data arrives - it comes via SSE + polling in the LiveContext. The key insight is that pages should show loading until the first successful data fetch.
+
+Let me add an `initialLoading` state to the LiveContext:
+[0m
+[0m→ [0mRead app/live/LiveContext.tsx[90m [offset=106, limit=30][0m
+[0m
+[0m← [0mEdit app/live/LiveContext.tsx
+Index: /Users/liang/work/agent-monitor-worktrees/empty-states/app/live/LiveContext.tsx
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/empty-states/app/live/LiveContext.tsx
++++ /Users/liang/work/agent-monitor-worktrees/empty-states/app/live/LiveContext.tsx
+@@ -106,8 +106,9 @@
+ // ─── Context shape ──────────────────────────────────────────────────────────
+ 
+ interface LiveContextValue {
+   connected: boolean;
++  initialLoading: boolean;
+   tasks: AgentTask[];
+   fileChanges: Record<string, FileChangesResult>;
+   eventLog: EventLogEntry[];
+   sseEventsCount: number;
+
+[0m
+[0m→ [0mRead app/live/LiveContext.tsx[90m [offset=136, limit=50][0m
+[0m
+Now I need to add the `initialLoading` state to the provider. Let me read the relevant section:
+[0m
+[0m← [0mEdit app/live/LiveContext.tsx
+Index: /Users/liang/work/agent-monitor-worktrees/empty-states/app/live/LiveContext.tsx
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/empty-states/app/live/LiveContext.tsx
++++ /Users/liang/work/agent-monitor-worktrees/empty-states/app/live/LiveContext.tsx
+@@ -135,8 +135,9 @@
+ // ─── Provider ───────────────────────────────────────────────────────────────
+ 
+ export function LiveProvider({ children }: { children: ReactNode }) {
+   const [connected, setConnected] = useState(false);
++  const [initialLoading, setInitialLoading] = useState(true);
+   const [tasks, setTasks] = useState<AgentTask[]>([]);
+   const [fileChanges, setFileChanges] = useState<Record<string, FileChangesResult>>({});
+   const [eventLog, setEventLog] = useState<EventLogEntry[]>([]);
+   const [gitDirs, setGitDirs] = useState<string[]>([]);
+
+[0m
+Now update the fetchTasks to mark initial loading as done:
+[0m
+[0m← [0mEdit app/live/LiveContext.tsx
+Index: /Users/liang/work/agent-monitor-worktrees/empty-states/app/live/LiveContext.tsx
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/empty-states/app/live/LiveContext.tsx
++++ /Users/liang/work/agent-monitor-worktrees/empty-states/app/live/LiveContext.tsx
+@@ -173,8 +173,10 @@
+       setTasks(data.tasks);
+     }
+   } catch {
+     // silently retry next interval
++  } finally {
++    setInitialLoading(false);
+   }
+ }, []);
+ 
+ useEffect(() => {
+
+[0m
+Now add `initialLoading` to the value object. Let me find that section:
+[0m
+[0m→ [0mRead app/live/LiveContext.tsx[90m [limit=20, offset=355][0m
+[0m
+[0m← [0mEdit app/live/LiveContext.tsx
+Index: /Users/liang/work/agent-monitor-worktrees/empty-states/app/live/LiveContext.tsx
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/empty-states/app/live/LiveContext.tsx
++++ /Users/liang/work/agent-monitor-worktrees/empty-states/app/live/LiveContext.tsx
+@@ -360,8 +360,9 @@
+ // ── Value ───────────────────────────────────────────────────────────────
+ 
+ const value: LiveContextValue = {
+   connected,
++  initialLoading,
+   tasks,
+   fileChanges,
+   eventLog,
+   sseEventsCount,
+
+[0m
+Good, no more LSP errors. Now let me add loading skeletons to each of the four pages. Let me do them all in parallel:
+[0m
+[0m← [0mEdit app/live/agents/page.tsx
+Index: /Users/liang/work/agent-monitor-worktrees/empty-states/app/live/agents/page.tsx
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/empty-states/app/live/agents/page.tsx
++++ /Users/liang/work/agent-monitor-worktrees/empty-states/app/live/agents/page.tsx
+@@ -4,8 +4,9 @@
+ import { useState, useEffect, useCallback, useMemo } from "react";
+ import Link from "next/link";
+ import { useLive } from "../LiveContext";
+ import type { AgentTask, FileChangesResult } from "../LiveContext";
++import { AgentGridSkeleton, useMinimumLoading } from "../components/LoadingSkeleton";
+ 
+ // ─── Progress steps ─────────────────────────────────────────────────────────
+ 
+ const STEPS = ["Spawned", "Coding", "PR", "CI", "Review", "Merged"] as const;
+
+[0m
+Now add the loading check in the agents page component:
+[0m
+[0m← [0mEdit app/live/agents/page.tsx
+Index: /Users/liang/work/agent-monitor-worktrees/empty-states/app/live/agents/page.tsx
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/empty-states/app/live/agents/page.tsx
++++ /Users/liang/work/agent-monitor-worktrees/empty-states/app/live/agents/page.tsx
+@@ -582,9 +582,10 @@
+ 
+ // ─── Page ───────────────────────────────────────────────────────────────────
+ 
+ export default function LiveAgentsPage() {
+-  const { tasks, fileChanges } = useLive();
++  const { tasks, fileChanges, initialLoading } = useLive();
++  const dataReady = useMinimumLoading(!initialLoading);
+ 
+   // Map file changes by worktree path for each task
+   const taskFileData = useMemo(() => {
+     const map = new Map<string, FileChangesResult>();
+@@ -595,8 +596,23 @@
+     }
+     return map;
+   }, [tasks, fileChanges]);
+ 
++  if (!dataReady) {
++    return (
++      <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8">
++        <div className="flex items-center justify-between">
++          <div className="space-y-2">
++            <div className="h-8 w-64 rounded-lg bg-slate-800/60 animate-pulse" />
++            <div className="h-4 w-40 rounded bg-slate-800/60 animate-pulse" />
++          </div>
++          <div className="h-7 w-16 rounded-lg bg-slate-800/60 animate-pulse" />
++        </div>
++        <AgentGridSkeleton count={3} />
++      </div>
++    );
++  }
++
+   return (
+     <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8">
+       {/* ── Header ───────────────────────────────────────────────────────── */}
+       <motion.div
+
+[0m
+Now add loading skeleton to the tasks page:
+[0m
+[0m← [0mEdit app/live/tasks/page.tsx
+Index: /Users/liang/work/agent-monitor-worktrees/empty-states/app/live/tasks/page.tsx
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/empty-states/app/live/tasks/page.tsx
++++ /Users/liang/work/agent-monitor-worktrees/empty-states/app/live/tasks/page.tsx
+@@ -3,8 +3,9 @@
+ import { useState, useCallback } from "react";
+ import { motion, AnimatePresence } from "framer-motion";
+ import { useLive } from "../LiveContext";
+ import type { AgentTask } from "../LiveContext";
++import { CardListSkeleton, useMinimumLoading } from "../components/LoadingSkeleton";
+ 
+ // ─── Helpers ────────────────────────────────────────────────────────────────
+ 
+ function statusBadge(status: string) {
+
+[0m
+[0m← [0mEdit app/live/tasks/page.tsx
+Index: /Users/liang/work/agent-monitor-worktrees/empty-states/app/live/tasks/page.tsx
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/empty-states/app/live/tasks/page.tsx
++++ /Users/liang/work/agent-monitor-worktrees/empty-states/app/live/tasks/page.tsx
+@@ -423,17 +423,41 @@
+ 
+ // ─── Page ───────────────────────────────────────────────────────────────────
+ 
+ export default function TasksPage() {
+-  const { tasks } = useLive();
++  const { tasks, initialLoading } = useLive();
++  const dataReady = useMinimumLoading(!initialLoading);
+   const [spawnOpen, setSpawnOpen] = useState(false);
+ 
+   const running = tasks.filter((t) => t.status === "running");
+   const pending = tasks.filter((t) => t.status === "pending");
+   const history = tasks.filter(
+     (t) => t.status === "completed" || t.status === "failed" || t.status === "done" || t.status === "dead" || t.status === "unknown"
+   );
+ 
++  if (!dataReady) {
++    return (
++      <div className="p-4 md:p-8 space-y-8">
++        <div className="flex flex-wrap items-center gap-4">
++          <div className="flex gap-4">
++            {Array.from({ length: 5 }).map((_, i) => (
++              <div key={i} className="h-4 w-20 rounded bg-slate-800/60 animate-pulse" />
++            ))}
++          </div>
++          <div className="ml-auto h-8 w-24 rounded-lg bg-slate-800/60 animate-pulse" />
++        </div>
++        <div className="space-y-2">
++          <div className="h-4 w-20 rounded bg-slate-800/60 animate-pulse" />
++          <CardListSkeleton count={2} />
++        </div>
++        <div className="space-y-2">
++          <div className="h-4 w-24 rounded bg-slate-800/60 animate-pulse" />
++          <CardListSkeleton count={2} />
++        </div>
++      </div>
++    );
++  }
++
+   return (
+     <div className="p-4 md:p-8 space-y-8">
+       {/* ── Summary Bar ──────────────────────────────────────────────────── */}
+       <motion.div
+
+[0m
+Now add loading skeleton to the git page:
+[0m
+[0m← [0mEdit app/live/git/page.tsx
+Index: /Users/liang/work/agent-monitor-worktrees/empty-states/app/live/git/page.tsx
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/empty-states/app/live/git/page.tsx
++++ /Users/liang/work/agent-monitor-worktrees/empty-states/app/live/git/page.tsx
+@@ -3,8 +3,9 @@
+ import { useState, useCallback, useRef, useEffect } from "react";
+ import { motion, AnimatePresence } from "framer-motion";
+ import { useLive } from "../LiveContext";
+ import type { GitCommit } from "../LiveContext";
++import { GitSkeleton, useMinimumLoading } from "../components/LoadingSkeleton";
+ 
+ // ─── Types ────────────────────────────────────────────────────────────────────
+ 
+ interface DiffFileStat {
+
+[0m
+[0m← [0mEdit app/live/git/page.tsx
+Index: /Users/liang/work/agent-monitor-worktrees/empty-states/app/live/git/page.tsx
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/empty-states/app/live/git/page.tsx
++++ /Users/liang/work/agent-monitor-worktrees/empty-states/app/live/git/page.tsx
+@@ -480,9 +480,11 @@
+   setGitInput,
+   gitData,
+   handleAddGitDir,
+   removeGitDir,
++  initialLoading,
+ } = useLive();
++const dataReady = useMinimumLoading(!initialLoading);
+ 
+ // Track active tab by directory path (persists across data refreshes)
+ const [activeDir, setActiveDir] = useState<string | null>(null);
+ const tabsContainerRef = useRef<HTMLDivElement>(null);
+
+[0m
+Now add the loading state rendering in the git page's return:
+[0m
+[0m← [0mEdit app/live/git/page.tsx
+Index: /Users/liang/work/agent-monitor-worktrees/empty-states/app/live/git/page.tsx
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/empty-states/app/live/git/page.tsx
++++ /Users/liang/work/agent-monitor-worktrees/empty-states/app/live/git/page.tsx
+@@ -503,8 +503,20 @@
+ const activeInfo = resolvedActiveDir ? gitData[resolvedActiveDir] : undefined;
+ 
+ return (
+   <div className="p-4 md:p-8 space-y-6">
++    {!dataReady ? (
++      <div className="space-y-6">
++        <div className="space-y-2">
++          <div className="h-4 w-32 rounded bg-slate-800/60 animate-pulse" />
++        </div>
++        <div className="flex gap-2">
++          <div className="flex-1 h-10 rounded-lg bg-slate-800/60 animate-pulse" />
++          <div className="h-10 w-20 rounded-lg bg-slate-800/60 animate-pulse" />
++        </div>
++        <GitSkeleton />
++      </div>
++    ) : (
+     <motion.section
+       initial={{ opacity: 0, y: 20 }}
+       animate={{ opacity: 1, y: 0 }}
+     >
+
+[0m
+[0m→ [0mRead app/live/git/page.tsx[90m [limit=20, offset=655][0m
+[0m
+I need to close the conditional at the end of the section. Let me read the end of the file:
+[0m
+[0m← [0mEdit app/live/git/page.tsx
+Index: /Users/liang/work/agent-monitor-worktrees/empty-states/app/live/git/page.tsx
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/empty-states/app/live/git/page.tsx
++++ /Users/liang/work/agent-monitor-worktrees/empty-states/app/live/git/page.tsx
+@@ -665,7 +665,8 @@
+             )}
+           </div>
+         )}
+       </motion.section>
++      )}
+     </div>
+   );
+ }
+
+[0m
+Now add loading skeleton to the files page:
+[0m
+[0m← [0mEdit app/live/files/page.tsx
+Index: /Users/liang/work/agent-monitor-worktrees/empty-states/app/live/files/page.tsx
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/empty-states/app/live/files/page.tsx
++++ /Users/liang/work/agent-monitor-worktrees/empty-states/app/live/files/page.tsx
+@@ -3,8 +3,9 @@
+ import { useMemo, useState } from "react";
+ import { motion } from "framer-motion";
+ import { useLive } from "../LiveContext";
+ import type { FileChange } from "../LiveContext";
++import { FilesSkeleton, useMinimumLoading } from "../components/LoadingSkeleton";
+ 
+ // Color palette per task index
+ const TASK_COLORS = [
+   { bg: "bg-cyan-400/10", border: "border-cyan-400/20", text: "text-cyan-400", fill: "#22d3ee", hoverBg: "hover:bg-cyan-400/15" },
+
+[0m
+[0m← [0mEdit app/live/files/page.tsx
+Index: /Users/liang/work/agent-monitor-worktrees/empty-states/app/live/files/page.tsx
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/empty-states/app/live/files/page.tsx
++++ /Users/liang/work/agent-monitor-worktrees/empty-states/app/live/files/page.tsx
+@@ -223,9 +223,10 @@
+ 
+ // ─── Main Page ──────────────────────────────────────────────────────────────
+ 
+ export default function LiveFilesPage() {
+-  const { fileChanges, tasks } = useLive();
++  const { fileChanges, tasks, initialLoading } = useLive();
++  const dataReady = useMinimumLoading(!initialLoading);
+   const [hoveredFile, setHoveredFile] = useState<TreemapFile | null>(null);
+   const [sortField, setSortField] = useState<"total" | "additions" | "deletions" | "path">("total");
+   const [sortAsc, setSortAsc] = useState(false);
+ 
+
+[0m
+Now add loading state check before the main render in files page. Let me find the right spot:
+[0m
+[0m→ [0mRead app/live/files/page.tsx[90m [limit=30, offset=297][0m
+[0m
+[0m← [0mEdit app/live/files/page.tsx
+Index: /Users/liang/work/agent-monitor-worktrees/empty-states/app/live/files/page.tsx
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/empty-states/app/live/files/page.tsx
++++ /Users/liang/work/agent-monitor-worktrees/empty-states/app/live/files/page.tsx
+@@ -297,8 +297,20 @@
+   sortField === field ? (sortAsc ? " ▲" : " ▼") : "";
+ 
+ const useFewFilesLayout = allFiles.length > 0 && allFiles.length <= 5;
+ 
++if (!dataReady) {
++  return (
++    <div className="p-6 max-w-7xl mx-auto space-y-6">
++      <div className="space-y-2">
++        <div className="h-6 w-36 rounded bg-slate-800/60 animate-pulse" />
++        <div className="h-3 w-64 rounded bg-slate-800/60 animate-pulse" />
++      </div>
++      <FilesSkeleton />
++    </div>
++  );
++}
++
+ if (allFiles.length === 0) {
+   return (
+     <div className="p-6 max-w-7xl mx-auto">
+       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+
+[0m
+[0m# [0mTodos
+[x] Task 1: Overview empty state (app/live/page.tsx) - animated terminal icon, heading, subtext, New Task button, pulsing animation
+[x] Task 2: Agents page empty state (app/live/agents/page.tsx) - robot icon, heading, subtext
+[x] Task 3: Create shared LoadingSkeleton component at app/live/components/LoadingSkeleton.tsx
+[x] Task 3b: Add loading skeletons to agents, tasks, git, files pages
+[ ] Task 4: Agent page task selector (app/live/agent/page.tsx) - dropdown for completed tasks when none active
+[ ] Run npm run build to verify everything compiles
+[0m
+Now Task 4: Improve the agent page task selector. Looking at the current `agent/page.tsx`, it already has a task selector dropdown when `tasks.length > 1` (line 131). The ask is: when multiple tasks exist but none are active (running), show a dropdown to select a completed task and view its logs. Let me re-read the current page to understand what needs to change:
+[0m
+[0m→ [0mRead app/live/agent/page.tsx[90m [limit=100, offset=60][0m
+[0m
+The current code already has a task selector when `tasks.length > 1`. The enhancement needed is: when there are NO tasks at all, show an empty state, and when there are tasks but none are running, always show the selector prominently (even if only 1 task). Let me also handle the empty tasks case with a nice empty state, and make the selector visible when there's exactly 1 completed task:
+[0m
+[0m← [0mEdit app/live/agent/page.tsx
+Index: /Users/liang/work/agent-monitor-worktrees/empty-states/app/live/agent/page.tsx
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/empty-states/app/live/agent/page.tsx
++++ /Users/liang/work/agent-monitor-worktrees/empty-states/app/live/agent/page.tsx
+@@ -64,9 +64,9 @@
+ const { tasks, eventLog } = useLive();
+ 
+ // Find current or most recent task
+ const runningTask = tasks.find((t) => t.status === "running");
+-const latestTask = runningTask ?? tasks.sort((a, b) => {
++const latestTask = runningTask ?? [...tasks].sort((a, b) => {
+   const aTime = new Date(a.startedAt).getTime();
+   const bTime = new Date(b.startedAt).getTime();
+   return bTime - aTime;
+ })[0] ?? null;
+@@ -83,16 +83,83 @@
+ }, [runningTask, latestTask, selectedTaskId]);
+ 
+ const selectedTask = tasks.find((t) => t.id === selectedTaskId) ?? latestTask;
+ const isActive = selectedTask?.tmuxAlive || selectedTask?.status === "running";
++const hasNoRunning = !runningTask;
++const showTaskSelector = tasks.length > 0 && (tasks.length > 1 || hasNoRunning);
+ 
+ const { lines, scrollRef } = useAgentLog(selectedTask?.id ?? null);
+ 
+ const recentCompleted = tasks
+   .filter((t) => t.status === "completed" || t.status === "done")
+   .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())
+   .slice(0, 5);
+ 
++// ── No tasks at all: empty state ──────────────────────────────────────
++if (tasks.length === 0) {
++  return (
++    <div className="p-4 md:p-8 space-y-6">
++      <motion.section
++        initial={{ opacity: 0, y: 20 }}
++        animate={{ opacity: 1, y: 0 }}
++      >
++        <h2 className="text-sm font-mono text-purple-400 mb-3 flex items-center gap-2">
++          <span className="text-purple-400/50">&gt;</span> Agent Process
++        </h2>
++
++        <div className="relative bg-slate-900/50 border border-slate-800/50 rounded-xl p-16 flex flex-col items-center justify-center text-center overflow-hidden">
++          <motion.div
++            animate={{ opacity: [0.02, 0.06, 0.02] }}
++            transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
++            className="absolute inset-0 bg-gradient-to-br from-cyan-400/10 via-transparent to-purple-500/10 pointer-events-none"
++          />
++
++          <motion.div
++            initial={{ scale: 0.8, opacity: 0 }}
++            animate={{ scale: 1, opacity: 1 }}
++            transition={{ delay: 0.15, type: "spring", stiffness: 200 }}
++            className="relative mb-6"
++          >
++            <motion.div
++              animate={{ y: [0, -3, 0] }}
++              transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut" }}
++            >
++              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-cyan-400/15 to-purple-500/15 border border-cyan-400/20 flex items-center justify-center">
++                <svg className="w-8 h-8 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
++                  <path strokeLinecap="round" strokeLinejoin="round" d="m6.75 7.5 3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0 0 21 18V6a2.25 2.25 0 0 0-2.25-2.25H5.25A2.25 2.25 0 0 0 3 6v12a2.25 2.25 0 0 0 2.25 2.25Z" />
++                </svg>
++              </div>
++            </motion.div>
++            <motion.div
++              animate={{ scale: [1, 1.4, 1], opacity: [0.3, 0, 0.3] }}
++              transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut" }}
++              className="absolute inset-0 rounded-2xl border border-cyan-400/20"
++            />
++          </motion.div>
++
++          <motion.h3
++            initial={{ opacity: 0, y: 8 }}
++            animate={{ opacity: 1, y: 0 }}
++            transition={{ delay: 0.3 }}
++            className="text-lg font-semibold text-slate-200 mb-2"
++          >
++            No agent process
++          </motion.h3>
++
++          <motion.p
++            initial={{ opacity: 0, y: 8 }}
++            animate={{ opacity: 1, y: 0 }}
++            transition={{ delay: 0.4 }}
++            className="text-sm font-mono text-slate-400 max-w-xs"
++          >
++            Spawn a task to see live agent output here
++          </motion.p>
++        </div>
++      </motion.section>
++    </div>
++  );
++}
++
+ return (
+   <div className="p-4 md:p-8 space-y-6">
+     {/* ── Agent Status Header ──────────────────────────────────────────── */}
+     <motion.section
+
+[0m
+Now update the task selector condition to use `showTaskSelector`:
+[0m
+[0m← [0mEdit app/live/agent/page.tsx
+Index: /Users/liang/work/agent-monitor-worktrees/empty-states/app/live/agent/page.tsx
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/empty-states/app/live/agent/page.tsx
++++ /Users/liang/work/agent-monitor-worktrees/empty-states/app/live/agent/page.tsx
+@@ -193,10 +193,10 @@
+   </span>
+ </div>
+ 
+ <div className="flex items-center gap-2">
+-  {/* Task selector */}
+-  {tasks.length > 1 && (
++  {/* Task selector — shown when multiple tasks or no running task */}
++  {showTaskSelector && (
+     <select
+       value={selectedTaskId}
+       onChange={(e) => setSelectedTaskId(e.target.value)}
+       className="bg-slate-800/50 border border-slate-700 rounded-lg px-2 py-1 text-[10px] font-mono text-slate-300 focus:outline-none focus:border-cyan-400/50"
+
+[0m
+[0m# [0mTodos
+[x] Task 1: Overview empty state (app/live/page.tsx) - animated terminal icon, heading, subtext, New Task button, pulsing animation
+[x] Task 2: Agents page empty state (app/live/agents/page.tsx) - robot icon, heading, subtext
+[x] Task 3: Create shared LoadingSkeleton component at app/live/components/LoadingSkeleton.tsx
+[x] Task 3b: Add loading skeletons to agents, tasks, git, files pages
+[x] Task 4: Agent page task selector (app/live/agent/page.tsx) - dropdown for completed tasks when none active
+[ ] Run npm run build to verify everything compiles
+[0m
+Now let's run the build to verify everything compiles:
+[0m
+[0m$ [0mnpm run build 2>&1
+> agent-monitor@0.1.0 build
+> next build
+
+▲ Next.js 16.1.6 (Turbopack)
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 1840.6ms
+  Running TypeScript ...
+  Collecting page data using 9 workers ...
+  Generating static pages using 9 workers (0/14) ...
+  Generating static pages using 9 workers (3/14) 
+  Generating static pages using 9 workers (6/14) 
+  Generating static pages using 9 workers (10/14) 
+✓ Generating static pages using 9 workers (14/14) in 131.3ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ƒ /api/agent-log
+├ ƒ /api/agent-tasks
+├ ƒ /api/config
+├ ƒ /api/events
+├ ƒ /api/file-changes
+├ ƒ /api/git
+├ ƒ /api/git-diff
+├ ƒ /api/health
+├ ƒ /api/prompts
+├ ƒ /api/sessions
+├ ƒ /api/spawn-task
+├ ○ /live
+├ ○ /live/agent
+├ ○ /live/agents
+├ ○ /live/architecture
+├ ○ /live/files
+├ ○ /live/git
+├ ○ /live/monitoring
+├ ○ /live/prompt
+├ ○ /live/tasks
+└ ○ /live/timeline
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+[0m
+[0m# [0mTodos
+[x] Task 1: Overview empty state (app/live/page.tsx) - animated terminal icon, heading, subtext, New Task button, pulsing animation
+[x] Task 2: Agents page empty state (app/live/agents/page.tsx) - robot icon, heading, subtext
+[x] Task 3: Create shared LoadingSkeleton component at app/live/components/LoadingSkeleton.tsx
+[x] Task 3b: Add loading skeletons to agents, tasks, git, files pages
+[x] Task 4: Agent page task selector (app/live/agent/page.tsx) - dropdown for completed tasks when none active
+[x] Run npm run build to verify everything compiles
+[0m
+Build passes cleanly with no errors.
+[0m
+All tasks complete. Here's a summary of what was implemented:
+
+---
+
+## Changes Summary
+
+### Task 1: Overview empty state (`app/live/page.tsx`)
+- When `totalTasks === 0` and no events exist, the Event Log area now shows a polished empty state with:
+  - Animated floating terminal/code icon with pulse ring effect
+  - "Ready to orchestrate" heading
+  - "Spawn your first agent task to see the dashboard come alive" subtext
+  - Prominent **New Task** button linking to `/live/tasks`
+  - Subtle pulsing gradient background animation
+
+### Task 2: Agents page empty state (`app/live/agents/page.tsx`)
+- Replaced the plain text empty state with a centered, animated design:
+  - Floating robot icon with purple gradient and pulse ring
+  - "No agents running" heading
+  - "Start a task to see agents appear here" subtext
+
+### Task 3: Loading skeletons (`app/live/components/LoadingSkeleton.tsx`)
+- Created shared component with shimmer-animated skeleton variants:
+  - `Shimmer` - base block with animated gradient sweep
+  - `StatCardsSkeleton` - 4-card grid skeleton
+  - `CardListSkeleton` - vertical card list skeleton (tasks)
+  - `AgentGridSkeleton` - 3-column agent card grid skeleton
+  - `GitSkeleton` - tab bar + content panel skeleton
+  - `FilesSkeleton` - treemap + table skeleton
+  - `useMinimumLoading(isReady, minMs)` hook - ensures skeleton shows for at least 500ms to prevent flash
+
+### Task 3b: Loading states integrated into pages
+- **LiveContext**: Added `initialLoading` state that flips to `false` after first API fetch completes
+- **Agents page**: Shows `AgentGridSkeleton` during initial load
+- **Tasks page**: Shows `CardListSkeleton` during initial load
+- **Git page**: Shows `GitSkeleton` during initial load
+- **Files page**: Shows `FilesSkeleton` during initial load
+
+### Task 4: Agent page task selector (`app/live/agent/page.tsx`)
+- When no tasks exist at all, shows a polished empty state with animated terminal icon
+- Task selector dropdown now shows whenever tasks exist and either there are multiple tasks OR no running task (previously only showed with 2+ tasks)
+- Fixed a `.sort()` mutation bug on the tasks array (now uses `[...tasks].sort()`)
+[0m

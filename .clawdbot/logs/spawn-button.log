@@ -1,0 +1,341 @@
+[0m
+> build · claude-opus-4.6
+[0m
+[0m# [0mTodos
+[ ] Explore codebase structure and relevant files
+[ ] Task 1: Add spawn button + modal to Tasks page
+[ ] Task 2: Create /api/spawn-task endpoint
+[ ] Task 3: Fix Monitoring page stats
+[ ] Run npm run build to verify
+[0m
+I'll start by understanding the codebase structure and then implement all three tasks. Let me explore the relevant files first.
+[0m
+[0m• [0mExplore codebase structure[90m Explore Agent[0m
+[0m✓ [0mExplore codebase structure[90m Explore Agent[0m
+[0m→ [0mRead app/live/tasks/page.tsx
+[0m→ [0mRead app/live/monitoring/page.tsx
+[0m→ [0mRead app/live/LiveContext.tsx
+[0m
+Now let me read the key files I need to modify:
+[0m
+[0m→ [0mRead .clawdbot/spawn-agent.sh
+[0m
+Now let me also check the existing API routes for patterns:
+[0m
+[0m→ [0mRead app/api/agent-tasks/route.ts
+[0m→ [0mRead app/api/prompts/route.ts
+[0m
+[0m# [0mTodos
+[x] Explore codebase structure and relevant files
+[ ] Task 1: Add spawn button + modal to Tasks page
+[ ] Task 2: Create /api/spawn-task endpoint
+[ ] Task 3: Fix Monitoring page stats
+[ ] Run npm run build to verify
+[0m
+Good, I have a full picture. Let me implement all three tasks. I'll start with Task 2 (the API endpoint) since Task 1 depends on it, and Task 3 is independent.
+
+**Task 2: Create /api/spawn-task endpoint**
+[0m
+[0m$ [0mls /Users/liang/work/agent-monitor-worktrees/spawn-button/app/api/
+agent-log
+agent-tasks
+config
+events
+file-changes
+git
+git-diff
+health
+prompts
+sessions
+[0m
+[0m$ [0mmkdir -p /Users/liang/work/agent-monitor-worktrees/spawn-button/app/api/spawn-task
+[0m
+[0m← [0mWrite app/api/spawn-task/route.ts
+Wrote file successfully.
+[0m
+[0m# [0mTodos
+[x] Explore codebase structure and relevant files
+[ ] Task 1: Add spawn button + modal to Tasks page
+[x] Task 2: Create /api/spawn-task endpoint
+[ ] Task 3: Fix Monitoring page stats
+[ ] Run npm run build to verify
+[0m
+Now **Task 1: Add spawn button + modal to Tasks page**:
+[0m
+[0m→ [0mRead app/live/tasks/page.tsx
+[0m
+[0m← [0mWrite app/live/tasks/page.tsx
+Wrote file successfully.
+[0m
+[0m# [0mTodos
+[x] Explore codebase structure and relevant files
+[x] Task 1: Add spawn button + modal to Tasks page
+[x] Task 2: Create /api/spawn-task endpoint
+[ ] Task 3: Fix Monitoring page stats
+[ ] Run npm run build to verify
+[0m
+[0m→ [0mRead app/live/monitoring/page.tsx[90m [offset=560][0m
+[0m
+Now **Task 3: Fix Monitoring page stats**. The problem is the bottom summary cards only count tasks currently at each stage (which are zero when no tasks are active). I need to show cumulative/historical counts, completed counts, a "No tasks yet" state, and success rate.
+[0m
+Now I need to replace the bottom summary cards section. The fix involves:
+1. Computing cumulative counts from all tasks (not just those at each flowchart stage)
+2. Showing completed counts alongside running
+3. Showing "No tasks yet" message when all are zero
+4. Adding total task count and success rate
+[0m
+[0m← [0mEdit app/live/monitoring/page.tsx
+Index: /Users/liang/work/agent-monitor-worktrees/spawn-button/app/live/monitoring/page.tsx
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/spawn-button/app/live/monitoring/page.tsx
++++ /Users/liang/work/agent-monitor-worktrees/spawn-button/app/live/monitoring/page.tsx
+@@ -560,65 +560,100 @@
+           </motion.div>
+         )}
+       </motion.div>
+ 
+-      {/* Stage summary cards — with timing info */}
+-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+-        {[
+-          { label: "Running", stages: ["coding"], color: "text-purple-500", bgColor: "bg-purple-500/10", borderColor: "border-purple-500/20" },
+-          { label: "In CI", stages: ["ci"], color: "text-amber-400", bgColor: "bg-amber-400/10", borderColor: "border-amber-400/20" },
+-          { label: "In Review", stages: ["review"], color: "text-cyan-400", bgColor: "bg-cyan-400/10", borderColor: "border-cyan-400/20" },
+-          { label: "Merged", stages: ["merge"], color: "text-emerald-400", bgColor: "bg-emerald-400/10", borderColor: "border-emerald-400/20" },
+-        ].map((card) => {
+-          const stageTasks = card.stages.flatMap((st) => tasksByStage[st] || []);
+-          const count = stageTasks.length;
+-          const timing = card.stages.length > 0 ? timingByStage[card.stages[0]] : null;
++      {/* Summary stats — cumulative counts from all tasks */}
++      {(() => {
++        // Compute cumulative stats from all tasks (not just current stage positions)
++        const totalTasks = tasks.length;
++        const runningCount = tasks.filter((t) => t.status === "running").length;
++        const completedCount = tasks.filter((t) => t.status === "completed" || t.status === "done").length;
++        const failedCount = tasks.filter((t) => t.status === "failed" || t.status === "dead").length;
++        const pendingCount = tasks.filter((t) => t.status === "pending").length;
++        const ciCount = tasks.filter((t) => t.status === "ci_pending" || t.status === "ci_failed").length;
++        const reviewCount = tasks.filter((t) => t.status === "ready_for_review").length;
+ 
++        const finishedCount = completedCount + failedCount;
++        const successRate = finishedCount > 0 ? Math.round((completedCount / finishedCount) * 100) : null;
++
++        const allZero = totalTasks === 0;
++
++        if (allZero) {
+           return (
+-            <div
+-              key={card.label}
+-              className={`rounded-xl border ${card.borderColor} ${card.bgColor} p-4`}
++            <motion.div
++              initial={{ opacity: 0, y: 10 }}
++              animate={{ opacity: 1, y: 0 }}
++              transition={{ delay: 0.3 }}
++              className="rounded-xl border border-slate-800/50 bg-slate-900/40 p-8 text-center"
+             >
+-              <div className="flex items-center justify-between mb-1">
+-                <div className="text-xs font-mono text-slate-500 uppercase tracking-wider">
++              <div className="text-slate-600 text-sm font-mono mb-2">No tasks yet</div>
++              <p className="text-[10px] font-mono text-slate-700">
++                Spawn an agent from the Tasks page to see monitoring data here
++              </p>
++            </motion.div>
++          );
++        }
++
++        const cards = [
++          {
++            label: "Total",
++            count: totalTasks,
++            sub: pendingCount > 0 ? `${pendingCount} pending` : null,
++            color: "text-slate-300",
++            bgColor: "bg-slate-500/10",
++            borderColor: "border-slate-500/20",
++          },
++          {
++            label: "Running",
++            count: runningCount,
++            sub: ciCount > 0 ? `${ciCount} in CI` : reviewCount > 0 ? `${reviewCount} in review` : null,
++            color: "text-purple-500",
++            bgColor: "bg-purple-500/10",
++            borderColor: "border-purple-500/20",
++          },
++          {
++            label: "Completed",
++            count: completedCount,
++            sub: failedCount > 0 ? `${failedCount} failed` : null,
++            color: "text-emerald-400",
++            bgColor: "bg-emerald-400/10",
++            borderColor: "border-emerald-400/20",
++          },
++          {
++            label: "Success Rate",
++            count: successRate !== null ? `${successRate}%` : "--",
++            sub: finishedCount > 0 ? `${finishedCount} finished` : "no finished tasks",
++            color: successRate !== null && successRate >= 80 ? "text-emerald-400" : successRate !== null && successRate >= 50 ? "text-amber-400" : successRate !== null ? "text-red-400" : "text-slate-500",
++            bgColor: successRate !== null && successRate >= 80 ? "bg-emerald-400/10" : successRate !== null && successRate >= 50 ? "bg-amber-400/10" : successRate !== null ? "bg-red-400/10" : "bg-slate-500/10",
++            borderColor: successRate !== null && successRate >= 80 ? "border-emerald-400/20" : successRate !== null && successRate >= 50 ? "border-amber-400/20" : successRate !== null ? "border-red-400/20" : "border-slate-500/20",
++          },
++        ];
++
++        return (
++          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
++            {cards.map((card) => (
++              <motion.div
++                key={card.label}
++                initial={{ opacity: 0, y: 10 }}
++                animate={{ opacity: 1, y: 0 }}
++                transition={{ delay: 0.3 }}
++                className={`rounded-xl border ${card.borderColor} ${card.bgColor} p-4`}
++              >
++                <div className="text-xs font-mono text-slate-500 uppercase tracking-wider mb-1">
+                   {card.label}
+                 </div>
+-                {timing?.duration && (
+-                  <div className="text-[10px] font-mono text-slate-500">
+-                    {timing.duration}
++                <div className={`text-2xl font-mono font-bold ${card.color}`}>
++                  {card.count}
++                </div>
++                {card.sub && (
++                  <div className="text-[10px] font-mono text-slate-500 mt-1">
++                    {card.sub}
+                   </div>
+                 )}
+-              </div>
+-              <div className={`text-2xl font-mono font-bold ${card.color}`}>
+-                {count}
+-              </div>
+-              {/* Show task names */}
+-              {stageTasks.length > 0 && (
+-                <div className="mt-2 pt-2 border-t border-slate-700/50 space-y-0.5">
+-                  {stageTasks.slice(0, 3).map((task) => (
+-                    <div key={task.id} className="flex items-center gap-1.5">
+-                      <span className={`w-1 h-1 rounded-full ${card.bgColor}`} style={{ opacity: 0.8 }} />
+-                      <span className="text-[10px] font-mono text-slate-400 truncate">
+-                        {task.name || task.id}
+-                      </span>
+-                    </div>
+-                  ))}
+-                  {stageTasks.length > 3 && (
+-                    <div className="text-[10px] font-mono text-slate-500 pl-2.5">
+-                      +{stageTasks.length - 3} more
+-                    </div>
+-                  )}
+-                </div>
+-              )}
+-              {/* Timestamp */}
+-              {timing?.lastEnteredTime && (
+-                <div className="text-[9px] font-mono text-slate-600 mt-1.5">
+-                  last @ {timing.lastEnteredTime}
+-                </div>
+-              )}
+-            </div>
+-          );
+-        })}
+-      </div>
++              </motion.div>
++            ))}
++          </div>
++        );
++      })()}
+     </div>
+   );
+ }
+
+[0m
+[0m# [0mTodos
+[x] Explore codebase structure and relevant files
+[x] Task 1: Add spawn button + modal to Tasks page
+[x] Task 2: Create /api/spawn-task endpoint
+[x] Task 3: Fix Monitoring page stats
+[ ] Run npm run build to verify
+[0m
+Now let's run the build to verify everything compiles:
+[0m
+[0m$ [0mnpm run build 2>&1
+> agent-monitor@0.1.0 build
+> next build
+
+▲ Next.js 16.1.6 (Turbopack)
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 2.2s
+  Running TypeScript ...
+  Collecting page data using 9 workers ...
+  Generating static pages using 9 workers (0/14) ...
+  Generating static pages using 9 workers (3/14) 
+  Generating static pages using 9 workers (6/14) 
+  Generating static pages using 9 workers (10/14) 
+✓ Generating static pages using 9 workers (14/14) in 130.3ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ƒ /api/agent-log
+├ ƒ /api/agent-tasks
+├ ƒ /api/config
+├ ƒ /api/events
+├ ƒ /api/file-changes
+├ ƒ /api/git
+├ ƒ /api/git-diff
+├ ƒ /api/health
+├ ƒ /api/prompts
+├ ƒ /api/sessions
+├ ƒ /api/spawn-task
+├ ○ /live
+├ ○ /live/agent
+├ ○ /live/agents
+├ ○ /live/architecture
+├ ○ /live/files
+├ ○ /live/git
+├ ○ /live/monitoring
+├ ○ /live/prompt
+├ ○ /live/tasks
+└ ○ /live/timeline
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+[0m
+Build passes cleanly with zero errors. All routes are present including the new `/api/spawn-task` endpoint.
+[0m
+[0m# [0mTodos
+[x] Explore codebase structure and relevant files
+[x] Task 1: Add spawn button + modal to Tasks page
+[x] Task 2: Create /api/spawn-task endpoint
+[x] Task 3: Fix Monitoring page stats
+[x] Run npm run build to verify
+[0m
+All three tasks are complete. Here's a summary of what was done:
+
+### Task 1: Spawn button + modal on Tasks page (`app/live/tasks/page.tsx`)
+- Added a **"+ New Task"** button in the summary bar (top-right, replaces the `auto-refresh 5s` label position)
+- Built a **SpawnTaskModal** component with:
+  - **Task ID** input: auto-enforces kebab-case (strips invalid chars on type)
+  - **Description** input: free text
+  - **Prompt** textarea: multiline, resizable, markdown-friendly
+  - **Agent Type** dropdown: `opencode` (single option as specified)
+  - Client-side validation with error messages
+  - Loading spinner during submission, success state with auto-close
+  - Animated modal with backdrop blur, matching the dark theme styling
+- POSTs to `/api/spawn-task`
+
+### Task 2: `/api/spawn-task` endpoint (`app/api/spawn-task/route.ts`)
+- **POST** handler with validation:
+  - `id` required, must be kebab-case
+  - `description` required
+  - `prompt` required
+  - `agent` validated against `["opencode", "claude", "codex"]`
+- Saves prompt to `.clawdbot/prompts/{id}.md`
+- Executes `spawn-agent.sh` via `execSync` with proper JSON-escaped args
+- Returns `{ success, taskId, branch, agent, output }` on success
+- Returns `{ success: false, errors, stderr }` on failure
+
+### Task 3: Fixed Monitoring page stats (`app/live/monitoring/page.tsx`)
+- Replaced stage-based counting (which showed zeros when no tasks at a stage) with **cumulative status-based counting** from all tasks
+- New summary cards: **Total**, **Running**, **Completed**, **Success Rate**
+- Each card shows a secondary line (e.g. "3 pending", "2 failed", "5 finished")
+- **Success rate** calculated as `completed / (completed + failed)` with color coding (green >= 80%, amber >= 50%, red < 50%)
+- When no tasks exist, shows a friendly **"No tasks yet"** empty state message
+[0m

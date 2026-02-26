@@ -1,0 +1,148 @@
+[0m
+> build · claude-opus-4.6
+[0m
+[0m# [0mTodos
+[ ] Explore codebase structure, LiveContext, and existing pages
+[ ] Fix Architecture page - show topology with historical agents
+[ ] Fix Prompt page - status matching, styling, word/token counts, agent log selector
+[ ] Run npm run build to verify
+[0m
+I'll start by exploring the codebase to understand the existing structure, then plan and implement the fixes.
+[0m
+[0m• [0mExplore codebase structure[90m Explore Agent[0m
+[0m✓ [0mExplore codebase structure[90m Explore Agent[0m
+[0m→ [0mRead app/live/architecture/page.tsx
+[0m→ [0mRead app/live/prompt/page.tsx
+[0m
+Now let me read the two target files and the LiveContext in full:
+[0m
+[0m→ [0mRead app/live/LiveContext.tsx
+[0m→ [0mRead app/api/prompts/route.ts
+[0m
+Now let me also check the prompts API to understand what data it returns:
+[0m
+[0m# [0mTodos
+[x] Explore codebase structure, LiveContext, and existing pages
+[ ] Fix Architecture page - show topology with historical agents
+[ ] Fix Prompt page - status matching, styling, word/token counts, agent log selector
+[ ] Run npm run build to verify
+[0m
+Now I have a clear picture. Let me implement both pages.
+
+## Architecture Page Improvements
+
+Key changes needed:
+1. Always show Allen→Nova→Agent topology (not empty when no agents)
+2. Show historical completed agents as grayed-out nodes branching off Nova
+3. Use tasks data properly — show task name, status badge, branch name on each agent node
+4. Active agents pulse, completed agents static, dead agents dimmed
+5. Add animated connection lines between nodes
+[0m
+[0m← [0mWrite app/live/architecture/page.tsx
+Wrote file successfully.
+[0m
+[0m# [0mTodos
+[x] Explore codebase structure, LiveContext, and existing pages
+[x] Fix Architecture page - show topology with historical agents
+[ ] Fix Prompt page - status matching, styling, word/token counts, agent log selector
+[ ] Run npm run build to verify
+[0m
+Now the Prompt page. Key issues to fix:
+1. The `PromptFile` interface in the client is missing `taskId` and `status` that the API returns — so status shows "unknown"
+2. Add color-coded left border based on status
+3. Add word count and estimated token count
+4. The Agent Log selector only shows active tasks — should show ALL tasks for selection
+[0m
+[0m← [0mWrite app/live/prompt/page.tsx
+Wrote file successfully.
+[0m
+[0m# [0mTodos
+[x] Explore codebase structure, LiveContext, and existing pages
+[x] Fix Architecture page - show topology with historical agents
+[x] Fix Prompt page - status matching, styling, word/token counts, agent log selector
+[ ] Run npm run build to verify
+[0m
+[0m$ [0mnpm run build 2>&1
+> agent-monitor@0.1.0 build
+> next build
+
+▲ Next.js 16.1.6 (Turbopack)
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 2.8s
+  Running TypeScript ...
+  Collecting page data using 9 workers ...
+  Generating static pages using 9 workers (0/14) ...
+  Generating static pages using 9 workers (3/14) 
+  Generating static pages using 9 workers (6/14) 
+  Generating static pages using 9 workers (10/14) 
+✓ Generating static pages using 9 workers (14/14) in 156.6ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ƒ /api/agent-log
+├ ƒ /api/agent-tasks
+├ ƒ /api/config
+├ ƒ /api/events
+├ ƒ /api/file-changes
+├ ƒ /api/git
+├ ƒ /api/git-diff
+├ ƒ /api/health
+├ ƒ /api/prompts
+├ ƒ /api/sessions
+├ ○ /live
+├ ○ /live/agent
+├ ○ /live/agents
+├ ○ /live/architecture
+├ ○ /live/files
+├ ○ /live/git
+├ ○ /live/monitoring
+├ ○ /live/prompt
+├ ○ /live/tasks
+└ ○ /live/timeline
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+[0m
+Build passes cleanly with no errors.
+[0m
+[0m# [0mTodos
+[x] Explore codebase structure, LiveContext, and existing pages
+[x] Fix Architecture page - show topology with historical agents
+[x] Fix Prompt page - status matching, styling, word/token counts, agent log selector
+[x] Run npm run build to verify
+[0m
+Build passes with zero errors. Here's a summary of what was changed:
+
+---
+
+## Architecture page (`app/live/architecture/page.tsx`)
+
+**Problem**: Empty diagram with just Allen→Nova when no agents are active. No visual distinction between agent states.
+
+**Fixes**:
+- **Always shows Allen→Nova→Agent topology** — the core Allen→Nova link is always rendered regardless of agent count
+- **Historical agents shown as grayed-out nodes** — completed agents at 0.6 opacity, dead/failed at 0.35 opacity with dashed borders
+- **Task data populates agent nodes** — each agent node shows task name, agent type sublabel, branch name (above the node), and a color-coded status badge (inside the node)
+- **Active agents pulse** — SVG `<animate>` on the glow circle makes active agent nodes visibly breathe; connection lines have dual animated particles
+- **Completed agents are static** — solid borders, green tint, reduced opacity
+- **Dead agents are dimmed** — dashed borders, red DEAD badge, 0.35 opacity, dashed connection lines
+- **Added legend bar** showing what each color/state means
+- **Summary cards** now show Active/Completed/Dead/Total instead of the previous Active/Dead/Worktrees/Total
+- **Agent details list** uses proper `statusColor()` mapping instead of just alive/dead binary
+
+## Prompt page (`app/live/prompt/page.tsx`)
+
+**Problem**: Status shows "unknown" for all prompts because the client `PromptFile` interface was missing `taskId` and `status` fields that the API returns. Agent log selector only showed active tasks.
+
+**Fixes**:
+- **Status matching** — Updated `PromptFile` interface to include `taskId`, `status`, and `startedAt` from the API response. Added `enrichedPrompts` that cross-references each prompt's `taskId` against live task data from `useLive()` to get real-time status
+- **Color-coded left border** — Each prompt card has a 3px left border colored by status (cyan=running, green=completed, red=failed, amber=pending, gray=unknown)
+- **Status badge** on each card showing the current status in matching color
+- **Word count and token estimate** — Added `wordCount()` and `estimateTokens()` (~3.8 chars/token) displayed on each card alongside line count
+- **Agent Log selector shows ALL tasks** — Replaced the two-dropdown approach (active-only vs fallback) with a single `<select>` using `<optgroup>` to organize tasks by status: Running, Pending, Completed, Failed/Dead, Other
+- **Selected task info display** — Status badge next to "Agent Log" header, and a header line in the log terminal showing which agent's log is being viewed
+[0m

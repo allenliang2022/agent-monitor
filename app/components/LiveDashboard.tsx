@@ -2,53 +2,15 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import type {
+  Session,
+  HealthData,
+  GitInfo,
+  EventLogEntry,
+  SSEUpdate,
+} from "../live/LiveContext";
 
-// ─── Types ──────────────────────────────────────────────────────────────────
-
-interface Session {
-  key?: string;
-  sessionId?: string;
-  agentId?: string;
-  age?: string;
-  ageMs?: number;
-  chatType?: string;
-  channel?: string;
-  updatedAt?: number;
-}
-
-interface HealthData {
-  status: string;
-  gateway?: string;
-  uptime?: string;
-  version?: string;
-  raw?: string;
-}
-
-interface GitInfo {
-  directory: string;
-  branch: string;
-  clean: boolean;
-  changedFiles: number;
-  status: string;
-  recentCommits: { hash: string; message: string }[];
-  diffStat: string;
-  error?: string;
-}
-
-interface EventLogEntry {
-  id: number;
-  timestamp: string;
-  type: string;
-  message: string;
-}
-
-interface SSEUpdate {
-  type: string;
-  timestamp: string;
-  sessions?: { sessions?: Session[] } | Session[];
-  health?: HealthData;
-  message?: string;
-}
+// ─── Types (local to this legacy component) ─────────────────────────────────
 
 interface TimelineEvent {
   id: number;

@@ -1,1 +1,30 @@
-[]
+[
+  {
+    "id": "settings-page",
+    "tmuxSession": "agent-settings-page",
+    "agent": "opencode",
+    "description": "Create a Settings page for dashboard configuration",
+    "repo": "agent-monitor",
+    "worktree": "settings-page",
+    "branch": "feat/settings-page",
+    "startedAt": 1772048225000,
+    "status": "running",
+    "retries": 0,
+    "maxRetries": 3,
+    "notifyOnComplete": true
+  },
+  {
+    "id": "performance-opt",
+    "tmuxSession": "agent-performance-opt",
+    "agent": "opencode",
+    "description": "Performance optimizations and code quality improvements",
+    "repo": "agent-monitor",
+    "worktree": "performance-opt",
+    "branch": "feat/performance-opt",
+    "startedAt": 1772048245000,
+    "status": "running",
+    "retries": 0,
+    "maxRetries": 3,
+    "notifyOnComplete": true
+  }
+]

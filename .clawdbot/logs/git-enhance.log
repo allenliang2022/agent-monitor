@@ -1,0 +1,292 @@
+[0m
+> build · claude-opus-4.6
+[0m
+[0m# [0mTodos
+[ ] Explore codebase: understand current git page, API endpoints, and existing patterns
+[ ] Task 1: Branch graph visualization with SVG
+[ ] Task 2: Commit details expansion with diff preview
+[ ] Task 3: Branch filter buttons
+[ ] Task 4: Commit search bar
+[ ] Run npm run build to verify
+[0m
+I'll start by exploring the codebase to understand the current structure, existing components, and the API endpoints.
+[0m
+[0m• [0mExplore git page and APIs[90m Explore Agent[0m
+[0m✓ [0mExplore git page and APIs[90m Explore Agent[0m
+[0m→ [0mRead app/live/git/page.tsx
+[0m→ [0mRead app/live/LiveContext.tsx
+[0m→ [0mRead app/api/git/route.ts
+[0m
+Now let me read the full git page file to understand every detail before making changes.
+[0m
+[0m→ [0mRead app/api/git-diff/route.ts
+[0m
+Now I need to enhance the API to provide branch information per commit. Let me also check what git log format provides branch data, and look at how the API route currently fetches git log.
+[0m
+[0m# [0mTodos
+[x] Explore codebase: understand current git page, API endpoints, and existing patterns
+[ ] Task 1: Branch graph visualization with SVG
+[ ] Task 2: Commit details expansion with diff preview
+[ ] Task 3: Branch filter buttons
+[ ] Task 4: Commit search bar
+[ ] Run npm run build to verify
+[0m
+Now I have a comprehensive understanding of the codebase. Let me plan the implementation:
+
+1. **API Enhancement**: Extend `/api/git/route.ts` to include branch info per commit (using `git log --all --decorate`)
+2. **Git Page Rewrite**: Completely rewrite `app/live/git/page.tsx` with all 4 features
+
+Let me start by enhancing the git API to provide branch/decoration data, then build the full page.
+
+First, let me update the API to provide richer git log data including branch decorations:
+[0m
+[0m→ [0mRead app/api/git/route.ts
+[0m
+Now I'll update the API to include branch decoration info and also list all branches:
+[0m
+[0m← [0mEdit app/api/git/route.ts
+Index: /Users/liang/work/agent-monitor-worktrees/git-enhance/app/api/git/route.ts
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/git-enhance/app/api/git/route.ts
++++ /Users/liang/work/agent-monitor-worktrees/git-enhance/app/api/git/route.ts
+@@ -23,18 +23,48 @@
+ 
+ try {
+   const branch = execGit("git rev-parse --abbrev-ref HEAD", dir);
+   const status = execGit("git status --short", dir);
++  // Include decoration (branch/tag refs) and parent hashes for graph rendering
+   const log = execGit(
+-    'git log --format="%H|%s|%an|%ar" -10',
++    'git log --all --format="%H|%P|%s|%an|%ar|%D" -20',
+     dir
+   );
+   const diffStat = execGit("git diff --stat", dir);
+ 
++  // List all branches with their latest commit and merge status
++  const branchList = execGit(
++    'git branch -a --format="%(refname:short)|%(objectname:short)|%(upstream:track)"',
++    dir
++  );
++
+   const changedFiles = status
+     .split("\n")
+     .filter((line) => line.trim().length > 0);
+ 
++  // Parse branches
++  const branches = branchList
++    .split("\n")
++    .filter((l) => l.trim())
++    .map((line) => {
++      const parts = line.split("|");
++      const name = parts[0] || "";
++      return {
++        name,
++        commit: parts[1] || "",
++        tracking: parts[2] || "",
++        isHead: name === branch,
++      };
++    })
++    .filter((b) => !b.name.startsWith("origin/"));
++
++  // Check which branches are merged into main/master
++  const mainBranch = branches.find((b) => b.name === "main" || b.name === "master")?.name || branch;
++  const mergedBranches = execGit(`git branch --merged ${mainBranch}`, dir)
++    .split("\n")
++    .map((l) => l.trim().replace(/^\*\s*/, ""))
++    .filter((l) => l.length > 0);
++
+   return Response.json({
+     directory: dir,
+     branch,
+     clean: changedFiles.length === 0,
+@@ -44,15 +74,23 @@
+       .split("\n")
+       .filter((l) => l.trim())
+       .map((line) => {
+         const parts = line.split("|");
++        const refs = (parts[5] || "").split(",").map((r) => r.trim()).filter(Boolean);
+         return {
+           hash: parts[0] || "",
+-          message: parts[1] || "",
+-          author: parts[2] || "",
+-          time: parts[3] || "",
++          parents: (parts[1] || "").split(" ").filter(Boolean),
++          message: parts[2] || "",
++          author: parts[3] || "",
++          time: parts[4] || "",
++          refs,
+         };
+       }),
++    branches: branches.map((b) => ({
++      ...b,
++      merged: mergedBranches.includes(b.name),
++    })),
++    mainBranch,
+     diffStat: diffStat || "(no changes)",
+   });
+ } catch (error: unknown) {
+   const message =
+
+[0m
+Now I need to update the `GitCommit` and `GitInfo` types in `LiveContext.tsx`:
+[0m
+[0m← [0mEdit app/live/LiveContext.tsx
+Index: /Users/liang/work/agent-monitor-worktrees/git-enhance/app/live/LiveContext.tsx
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/git-enhance/app/live/LiveContext.tsx
++++ /Users/liang/work/agent-monitor-worktrees/git-enhance/app/live/LiveContext.tsx
+@@ -50,20 +50,32 @@
+ }
+ 
+ export interface GitCommit {
+   hash: string;
++  parents?: string[];
+   message: string;
+   author?: string;
+   time?: string;
++  refs?: string[];
+ }
+ 
++export interface GitBranch {
++  name: string;
++  commit: string;
++  tracking: string;
++  isHead: boolean;
++  merged: boolean;
++}
++
+ export interface GitInfo {
+   directory: string;
+   branch: string;
+   clean: boolean;
+   changedFiles: number;
+   status: string;
+   recentCommits: GitCommit[];
++  branches?: GitBranch[];
++  mainBranch?: string;
+   diffStat: string;
+   error?: string;
+ }
+ 
+
+[0m
+Now let me write the completely enhanced git page with all 4 features. This is a major rewrite:
+[0m
+[0m← [0mWrite app/live/git/page.tsx
+Wrote file successfully.
+[0m
+[0m# [0mTodos
+[x] Explore codebase: understand current git page, API endpoints, and existing patterns
+[x] Task 1: Branch graph visualization with SVG
+[x] Task 2: Commit details expansion with diff preview
+[x] Task 3: Branch filter buttons
+[x] Task 4: Commit search bar
+[ ] Run npm run build to verify
+[0m
+Now let me run the build to verify:
+[0m
+[0m$ [0mnpm run build 2>&1
+> agent-monitor@0.1.0 build
+> next build
+
+▲ Next.js 16.1.6 (Turbopack)
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 1825.0ms
+  Running TypeScript ...
+  Collecting page data using 9 workers ...
+  Generating static pages using 9 workers (0/14) ...
+  Generating static pages using 9 workers (3/14) 
+  Generating static pages using 9 workers (6/14) 
+  Generating static pages using 9 workers (10/14) 
+✓ Generating static pages using 9 workers (14/14) in 125.3ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ƒ /api/agent-log
+├ ƒ /api/agent-tasks
+├ ƒ /api/config
+├ ƒ /api/events
+├ ƒ /api/file-changes
+├ ƒ /api/git
+├ ƒ /api/git-diff
+├ ƒ /api/health
+├ ƒ /api/prompts
+├ ƒ /api/sessions
+├ ƒ /api/spawn-task
+├ ○ /live
+├ ○ /live/agent
+├ ○ /live/agents
+├ ○ /live/architecture
+├ ○ /live/files
+├ ○ /live/git
+├ ○ /live/monitoring
+├ ○ /live/prompt
+├ ○ /live/tasks
+└ ○ /live/timeline
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+[0m
+[0m# [0mTodos
+[x] Explore codebase: understand current git page, API endpoints, and existing patterns
+[x] Task 1: Branch graph visualization with SVG
+[x] Task 2: Commit details expansion with diff preview
+[x] Task 3: Branch filter buttons
+[x] Task 4: Commit search bar
+[x] Run npm run build to verify
+[0m
+Build passes cleanly with no errors. Let me also verify the final state of both changed files:
+[0m
+All tasks complete. Build passes. Here's a summary of what was implemented:
+
+## Changes Made
+
+### 3 files modified:
+
+**1. `app/api/git/route.ts`** - Enhanced API to provide richer data:
+- Git log now uses `--all` flag and includes parent hashes (`%P`) and decorations (`%D`) for branch tracking, fetching 20 commits instead of 10
+- New: Lists all local branches with `git branch -a --format`, including commit SHA and tracking info  
+- New: Detects which branches are merged into the main branch via `git branch --merged`
+- Returns `branches[]` array and `mainBranch` identifier alongside existing data
+
+**2. `app/live/LiveContext.tsx`** - Extended types:
+- `GitCommit` now includes optional `parents: string[]` and `refs: string[]`
+- New `GitBranch` interface: `{ name, commit, tracking, isHead, merged }`
+- `GitInfo` extended with optional `branches: GitBranch[]` and `mainBranch: string`
+
+**3. `app/live/git/page.tsx`** - Complete rewrite (~750 lines) with all 4 features:
+
+### Task 1: Branch Graph Visualization
+- SVG-based `BranchGraph` component rendered above commit list
+- Main branch shown as a solid colored line with dots at start/end
+- Feature branches fork up/down from main with bezier curves
+- Merged branches converge back; unmerged branches have dangling ends
+- Active branches pulse via SVG `<animate>`, merged are semi-transparent, open are dashed
+- Branch labels and status badges ("active", "merged", "open")
+- SVG glow filters per branch color
+
+### Task 2: Commit Details Expansion
+- Click any commit to smoothly expand (framer-motion height animation)
+- Shows full commit message, SHA, author, parent hashes in a detail card
+- File list with +/- stats and mini change bars (green/red proportional)
+- Diff preview limited to first 20 lines per file with truncation indicator
+- File tabs to switch between changed files
+- Merge commits get a green "merge" badge
+
+### Task 3: Branch Filter
+- Three filter buttons at top: "All branches", "Main only", "Feature branches"
+- Each shows a count badge
+- Filters commits by their ref decorations
+- Branch name badges (`BranchBadge`) shown inline next to each commit
+
+### Task 4: Commit Search
+- Search bar with magnifying glass icon and clear button
+- Real-time filtering as you type
+- Matches against: commit message, author name, commit hash prefix, and file names
+- File name search pre-fetches diff data for the first 20 commits (cached per tab)
+- Result count shown: "X of Y shown"
+[0m

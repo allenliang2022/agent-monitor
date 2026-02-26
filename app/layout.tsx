@@ -2,8 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Navbar from "./components/Navbar";
-import KeyboardShortcuts from "./components/KeyboardShortcuts";
-import CommandPalette from "./components/CommandPalette";
+import ClientShell from "./components/ClientShell";
 import { ToastProvider } from "./components/Toast";
 
 const geistSans = Geist({
@@ -36,8 +35,7 @@ export default function RootLayout({
       >
         <ToastProvider>
           <Navbar />
-          <KeyboardShortcuts />
-          <CommandPalette />
+          <ClientShell />
           {children}
         </ToastProvider>
       </body>

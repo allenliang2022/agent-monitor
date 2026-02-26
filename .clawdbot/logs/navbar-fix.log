@@ -1,0 +1,359 @@
+[0m
+> build · claude-opus-4.6
+[0m
+[0m# [0mTodos
+[ ] Explore codebase structure and understand current layout/navbar setup
+[ ] Fix navbar overlap: Add pt-14 to app/live/layout.tsx wrapper
+[ ] Remove excessive top padding from app/live/page.tsx and normalize other live pages
+[ ] Responsive: Make navbar horizontally scrollable / add hamburger menu for mobile
+[ ] Responsive: Verify stats cards stack on mobile
+[ ] Responsive: Verify agent cards single column on mobile
+[ ] Responsive: Verify timeline events full width on mobile
+[ ] Run npm run build to verify no errors
+[0m
+I'll start by exploring the codebase structure and understanding the current state of the navbar, layouts, and live pages.
+[0m
+[0m• [0mExplore codebase structure[90m Explore Agent[0m
+[0m✓ [0mExplore codebase structure[90m Explore Agent[0m
+[0m
+Excellent. Now I have a comprehensive understanding of the codebase. Let me read the key files I need to edit.
+[0m
+[0m# [0mTodos
+[x] Explore codebase structure and understand current layout/navbar setup
+[ ] Fix navbar overlap: Add pt-14 to app/live/layout.tsx wrapper
+[ ] Remove excessive top padding from app/live/page.tsx and normalize other live pages
+[ ] Responsive: Make navbar horizontally scrollable / add hamburger menu for mobile
+[ ] Responsive: Verify stats cards stack on mobile
+[ ] Responsive: Verify agent cards single column on mobile
+[ ] Responsive: Verify timeline events full width on mobile
+[ ] Run npm run build to verify no errors
+[0m
+[0m→ [0mRead app/live/layout.tsx
+[0m→ [0mRead app/components/Navbar.tsx
+[0m→ [0mRead app/live/page.tsx[90m [offset=265, limit=10][0m
+[0m• [0mRead all live page wrappers[90m Explore Agent[0m
+[0m
+Now let me read the top sections of the other live pages to see their padding:
+[0m
+[0m✓ [0mRead all live page wrappers[90m Explore Agent[0m
+[0m→ [0mRead app/live/page.tsx[90m [offset=300, limit=60][0m
+[0m
+Now I have a clear picture. Let me also read the overview page's stats grid to verify responsive classes:
+[0m
+[0m✱ [0mGrep "grid-cols"[90m 2 matches[0m
+[0m
+Good. The overview page stats grid at line 383 uses `grid-cols-2 lg:grid-cols-4 gap-4` which is already responsive. Now let me start making the changes.
+
+### Step 1: Fix navbar overlap in `app/live/layout.tsx`
+[0m
+[0m← [0mEdit app/live/layout.tsx
+Index: /Users/liang/work/agent-monitor-worktrees/navbar-fix/app/live/layout.tsx
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/navbar-fix/app/live/layout.tsx
++++ /Users/liang/work/agent-monitor-worktrees/navbar-fix/app/live/layout.tsx
+@@ -4,9 +4,9 @@
+ 
+ export default function LiveLayout({ children }: { children: React.ReactNode }) {
+   return (
+     <LiveProvider>
+-      <div className="min-h-screen bg-gradient-to-b from-[#0a0a1a] to-[#111128] text-slate-200">
++      <div className="min-h-screen bg-gradient-to-b from-[#0a0a1a] to-[#111128] text-slate-200 pt-14">
+         {children}
+       </div>
+     </LiveProvider>
+   );
+
+[0m
+[0m# [0mTodos
+[x] Explore codebase structure and understand current layout/navbar setup
+[x] Fix navbar overlap: Add pt-14 to app/live/layout.tsx wrapper
+[ ] Remove excessive top padding from app/live/page.tsx and normalize other live pages
+[ ] Responsive: Make navbar horizontally scrollable / add hamburger menu for mobile
+[ ] Responsive: Verify stats cards stack on mobile
+[ ] Responsive: Verify agent cards single column on mobile
+[ ] Responsive: Verify timeline events full width on mobile
+[ ] Run npm run build to verify no errors
+[0m
+### Step 2: Remove excessive `pt-20` from Overview page and fix timeline's calc
+[0m
+[0m← [0mEdit app/live/page.tsx
+Index: /Users/liang/work/agent-monitor-worktrees/navbar-fix/app/live/page.tsx
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/navbar-fix/app/live/page.tsx
++++ /Users/liang/work/agent-monitor-worktrees/navbar-fix/app/live/page.tsx
+@@ -265,9 +265,9 @@
+   [sseEventsCount, activeAgents, totalTasks, totalCommits]
+ );
+ 
+ return (
+-  <div className="p-4 md:p-8 pt-20 space-y-8 max-w-7xl mx-auto">
++  <div className="p-4 md:p-8 pt-6 space-y-8 max-w-7xl mx-auto">
+     {/* ── MISSION CONTROL Hero ─────────────────────────────────────────── */}
+     <motion.div
+       initial={{ opacity: 0, y: -30 }}
+       animate={{ opacity: 1, y: 0 }}
+
+[0m
+Now let me fix the timeline page's `calc(100vh-4rem)` - since the layout now adds `pt-14` (3.5rem), the timeline's height calc should account for both the navbar (3rem/h-12) and the layout padding (3.5rem) = ~6.5rem total, plus its own padding. Let me read the timeline page more carefully:
+[0m
+[0m→ [0mRead app/live/timeline/page.tsx[90m [limit=15, offset=500][0m
+[0m
+The timeline uses `h-[calc(100vh-4rem)]` where `4rem` was meant to be the navbar height. Now with `pt-14` (3.5rem) added by the layout, the total offset from viewport top is navbar `h-12` (3rem) + `pt-14` (3.5rem) = 6.5rem. The timeline also has its own `p-4 md:p-8` padding. So the calc should be `100vh - 3.5rem` (just the layout padding, since the viewport already includes the sticky navbar's space in scroll context). Actually, let me think about this more carefully.
+
+The sticky navbar takes up 3rem (`h-12`) of visual space at the top. The `pt-14` (3.5rem) pushes content down. The timeline wants to fill the remaining viewport height. So: `100vh - 3rem (navbar) - 3.5rem (pt-14) = 100vh - 6.5rem`. But the timeline also has its own `p-4` (1rem) / `md:p-8` (2rem) padding which is inside the div, so the height calc just needs to account for the navbar + layout padding offset.
+[0m
+[0m← [0mEdit app/live/timeline/page.tsx
+Index: /Users/liang/work/agent-monitor-worktrees/navbar-fix/app/live/timeline/page.tsx
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/navbar-fix/app/live/timeline/page.tsx
++++ /Users/liang/work/agent-monitor-worktrees/navbar-fix/app/live/timeline/page.tsx
+@@ -502,9 +502,9 @@
+   </div>
+ );
+ 
+ return (
+-  <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-6 flex flex-col h-[calc(100vh-4rem)]">
++  <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-6 flex flex-col h-[calc(100vh-6.5rem)]">
+     {/* ── Header ───────────────────────────────────────────────────────── */}
+     <motion.div
+       initial={{ opacity: 0, y: 20 }}
+       animate={{ opacity: 1, y: 0 }}
+
+[0m
+[0m# [0mTodos
+[x] Explore codebase structure and understand current layout/navbar setup
+[x] Fix navbar overlap: Add pt-14 to app/live/layout.tsx wrapper
+[x] Remove excessive top padding from app/live/page.tsx and normalize other live pages
+[ ] Responsive: Make navbar horizontally scrollable / add hamburger menu for mobile
+[ ] Responsive: Verify stats cards stack on mobile
+[ ] Responsive: Verify agent cards single column on mobile
+[ ] Responsive: Verify timeline events full width on mobile
+[ ] Run npm run build to verify no errors
+[0m
+### Step 3: Add mobile hamburger menu to Navbar
+
+The navbar already has `overflow-x-auto scrollbar-hide` on the nav items container (line 26), which handles horizontal scrolling. But we also need a hamburger menu for mobile. Let me redesign the Navbar component:
+[0m
+[0m→ [0mRead app/components/Navbar.tsx
+[0m
+Now let me check if there's a `scrollbar-hide` utility defined anywhere:
+[0m
+[0m✱ [0mGrep "scrollbar-hide"[90m 0 matches[0m
+[0m✱ [0mGrep "scrollbar-hide"[90m 1 match[0m
+[0m→ [0mRead app/globals.css
+[0m
+`scrollbar-hide` is referenced but not defined anywhere - likely not working. Let me check globals.css and tailwind config:
+[0m
+[0m✱ [0mGlob "tailwind.config.*"[90m 0 matches[0m
+[0m
+Good. No tailwind config file (Tailwind v4 uses CSS-based config). The `scrollbar-hide` class is not defined anywhere - I need to add it to globals.css. Now let me write the updated Navbar with a mobile hamburger menu:
+[0m
+[0m← [0mWrite app/components/Navbar.tsx
+Wrote file successfully.
+[0m
+Now add the `scrollbar-hide` utility to globals.css:
+[0m
+[0m← [0mEdit app/globals.css
+Index: /Users/liang/work/agent-monitor-worktrees/navbar-fix/app/globals.css
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/navbar-fix/app/globals.css
++++ /Users/liang/work/agent-monitor-worktrees/navbar-fix/app/globals.css
+@@ -99,8 +99,17 @@
+     linear-gradient(90deg, rgba(0, 212, 255, 0.03) 1px, transparent 1px);
+   background-size: 40px 40px;
+ }
+ 
++/* Hide scrollbar for horizontal nav overflow */
++.scrollbar-hide {
++  -ms-overflow-style: none;
++  scrollbar-width: none;
++}
++.scrollbar-hide::-webkit-scrollbar {
++  display: none;
++}
++
+ @media (prefers-reduced-motion: reduce) {
+   .animate-pulse-dot {
+     animation: none;
+   }
+
+[0m
+[0m# [0mTodos
+[x] Explore codebase structure and understand current layout/navbar setup
+[x] Fix navbar overlap: Add pt-14 to app/live/layout.tsx wrapper
+[x] Remove excessive top padding from app/live/page.tsx and normalize other live pages
+[x] Responsive: Make navbar horizontally scrollable / add hamburger menu for mobile
+[ ] Responsive: Verify stats cards stack on mobile
+[ ] Responsive: Verify agent cards single column on mobile
+[ ] Responsive: Verify timeline events full width on mobile
+[ ] Run npm run build to verify no errors
+[0m
+[0m→ [0mRead app/live/page.tsx[90m [limit=30, offset=380][0m
+[0m→ [0mRead app/live/page.tsx[90m [limit=20, offset=520][0m
+[0m→ [0mRead app/live/agents/page.tsx[90m [limit=15, offset=636][0m
+[0m
+### Step 4: Verify responsive grids
+
+Let me check the key responsive patterns across the pages:
+[0m
+[0m→ [0mRead app/live/timeline/page.tsx[90m [limit=80, offset=506][0m
+[0m
+Let me verify the timeline page layout for responsiveness:
+[0m
+[0m→ [0mRead app/live/timeline/page.tsx[90m [limit=5, offset=546][0m
+[0m
+Good. The responsive grids look correct:
+
+- **Overview stats**: `grid-cols-2 lg:grid-cols-4` - stacks to 2 columns on mobile, 4 on large
+- **Overview nav cards**: `grid-cols-1 sm:grid-cols-2 lg:grid-cols-3` - single column on mobile
+- **Agents page**: `grid-cols-1 md:grid-cols-2 xl:grid-cols-3` - single column on mobile
+- **Timeline**: Full width with single column events - already responsive
+
+These are all correctly responsive. Let me also quickly check the filter buttons on the timeline page for mobile wrapping:
+[0m
+The filter buttons use `flex items-center gap-2` without wrapping - on very narrow screens they could overflow. Let me add `flex-wrap` to make them wrap on mobile:
+[0m
+[0m← [0mEdit app/live/timeline/page.tsx
+Index: /Users/liang/work/agent-monitor-worktrees/navbar-fix/app/live/timeline/page.tsx
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/navbar-fix/app/live/timeline/page.tsx
++++ /Users/liang/work/agent-monitor-worktrees/navbar-fix/app/live/timeline/page.tsx
+@@ -546,9 +546,9 @@
+ <motion.div
+   initial={{ opacity: 0, y: 10 }}
+   animate={{ opacity: 1, y: 0 }}
+   transition={{ duration: 0.4, delay: 0.1 }}
+-  className="flex items-center gap-2 shrink-0"
++  className="flex items-center gap-2 shrink-0 flex-wrap"
+ >
+   <span className="text-xs font-mono text-slate-500 mr-1">&gt; FILTER</span>
+   {FILTER_OPTIONS.map(({ key, label }) => (
+     <motion.button
+
+[0m
+Also check the timeline header area - the flex row with title and auto-scroll button might not stack well on mobile:
+[0m
+[0m← [0mEdit app/live/timeline/page.tsx
+Index: /Users/liang/work/agent-monitor-worktrees/navbar-fix/app/live/timeline/page.tsx
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/navbar-fix/app/live/timeline/page.tsx
++++ /Users/liang/work/agent-monitor-worktrees/navbar-fix/app/live/timeline/page.tsx
+@@ -508,9 +508,9 @@
+ <motion.div
+   initial={{ opacity: 0, y: 20 }}
+   animate={{ opacity: 1, y: 0 }}
+   transition={{ duration: 0.6 }}
+-  className="flex items-center justify-between shrink-0"
++  className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0"
+ >
+   <div>
+     <h1 className="text-2xl sm:text-3xl font-bold">
+       <span className="bg-gradient-to-r from-cyan-400 to-purple-500 bg-clip-text text-transparent">
+
+[0m
+[0m# [0mTodos
+[x] Explore codebase structure and understand current layout/navbar setup
+[x] Fix navbar overlap: Add pt-14 to app/live/layout.tsx wrapper
+[x] Remove excessive top padding from app/live/page.tsx and normalize other live pages
+[x] Responsive: Make navbar horizontally scrollable / add hamburger menu for mobile
+[x] Responsive: Verify stats cards stack on mobile
+[x] Responsive: Verify agent cards single column on mobile
+[x] Responsive: Verify timeline events full width on mobile
+[ ] Run npm run build to verify no errors
+[0m
+### Step 5: Run build to verify
+[0m
+[0m$ [0mnpm run build 2>&1
+> agent-monitor@0.1.0 build
+> next build
+
+▲ Next.js 16.1.6 (Turbopack)
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 1843.6ms
+  Running TypeScript ...
+  Collecting page data using 9 workers ...
+  Generating static pages using 9 workers (0/14) ...
+  Generating static pages using 9 workers (3/14) 
+  Generating static pages using 9 workers (6/14) 
+  Generating static pages using 9 workers (10/14) 
+✓ Generating static pages using 9 workers (14/14) in 138.6ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ƒ /api/agent-log
+├ ƒ /api/agent-tasks
+├ ƒ /api/config
+├ ƒ /api/events
+├ ƒ /api/file-changes
+├ ƒ /api/git
+├ ƒ /api/git-diff
+├ ƒ /api/health
+├ ƒ /api/prompts
+├ ƒ /api/sessions
+├ ƒ /api/spawn-task
+├ ○ /live
+├ ○ /live/agent
+├ ○ /live/agents
+├ ○ /live/architecture
+├ ○ /live/files
+├ ○ /live/git
+├ ○ /live/monitoring
+├ ○ /live/prompt
+├ ○ /live/tasks
+└ ○ /live/timeline
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+[0m
+Build passes cleanly with no errors or warnings.
+[0m
+[0m# [0mTodos
+[x] Explore codebase structure and understand current layout/navbar setup
+[x] Fix navbar overlap: Add pt-14 to app/live/layout.tsx wrapper
+[x] Remove excessive top padding from app/live/page.tsx and normalize other live pages
+[x] Responsive: Make navbar horizontally scrollable / add hamburger menu for mobile
+[x] Responsive: Verify stats cards stack on mobile
+[x] Responsive: Verify agent cards single column on mobile
+[x] Responsive: Verify timeline events full width on mobile
+[x] Run npm run build to verify no errors
+[0m
+All tasks complete. Here's a summary of the changes:
+
+## Summary of Changes
+
+### Task 1: Navbar Overlap Fix
+
+**`app/live/layout.tsx`** - Added `pt-14` (3.5rem / 56px) to the wrapper div. This provides navbar clearance for ALL live pages at the layout level, eliminating the need for individual pages to handle it.
+
+**`app/live/page.tsx:269`** - Changed `pt-20` to `pt-6`. The layout now handles navbar clearance, so the overview page only needs its own content padding.
+
+**`app/live/timeline/page.tsx:506`** - Updated `h-[calc(100vh-4rem)]` to `h-[calc(100vh-6.5rem)]` to correctly account for both the navbar height (3rem) and layout padding (3.5rem).
+
+The other 8 live sub-pages (`agents`, `agent`, `tasks`, `git`, `files`, `monitoring`, `prompt`, `architecture`) previously had **no** navbar clearance at all - they now all get proper clearance from the layout's `pt-14`.
+
+### Task 2: Responsive Improvements
+
+**`app/components/Navbar.tsx`** - Rewrote with:
+- Desktop (`md:` and up): horizontal nav items with `overflow-x-auto scrollbar-hide` for scrollable overflow
+- Mobile (below `md`): hamburger button that toggles an animated dropdown menu using `AnimatePresence`
+- Mobile menu auto-closes on route change and Escape key
+- Proper `aria-label` and `aria-expanded` attributes
+
+**`app/globals.css`** - Added `.scrollbar-hide` utility (was referenced but never defined).
+
+**`app/live/timeline/page.tsx`** - Two responsive fixes:
+- Header: changed to `flex-col sm:flex-row` so title and auto-scroll button stack on mobile
+- Filter buttons: added `flex-wrap` so they wrap instead of overflowing on narrow screens
+
+**Responsive grids verified** (already correct, no changes needed):
+- Overview stats: `grid-cols-2 lg:grid-cols-4` 
+- Overview nav cards: `grid-cols-1 sm:grid-cols-2 lg:grid-cols-3`
+- Agent cards: `grid-cols-1 md:grid-cols-2 xl:grid-cols-3`
+- Timeline events: full-width single column
+
+Build passes cleanly with `npm run build`.
+[0m
