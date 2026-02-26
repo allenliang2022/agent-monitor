@@ -9,6 +9,7 @@ import {
   useCallback,
   type ReactNode,
 } from "react";
+import { useSettings } from "./SettingsContext";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -147,6 +148,9 @@ export function useLive(): LiveContextValue {
 // ─── Provider ───────────────────────────────────────────────────────────────
 
 export function LiveProvider({ children }: { children: ReactNode }) {
+  const { settings } = useSettings();
+  const pollingMs = settings.pollingInterval * 1000;
+
   const [connected, setConnected] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [tasks, setTasks] = useState<AgentTask[]>([]);
@@ -193,9 +197,9 @@ export function LiveProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     fetchTasks();
-    const interval = setInterval(fetchTasks, 5000);
+    const interval = setInterval(fetchTasks, pollingMs);
     return () => clearInterval(interval);
-  }, [fetchTasks]);
+  }, [fetchTasks, pollingMs]);
 
   // ── Auto-populate git dirs from active tasks ───────────────────────────
 
@@ -239,9 +243,9 @@ export function LiveProvider({ children }: { children: ReactNode }) {
     gitDirs.forEach((d) => fetchGit(d));
     const interval = setInterval(() => {
       gitDirs.forEach((d) => fetchGit(d));
-    }, 5000);
+    }, pollingMs);
     return () => clearInterval(interval);
-  }, [gitDirs, fetchGit]);
+  }, [gitDirs, fetchGit, pollingMs]);
 
   // ── SSE connection ────────────────────────────────────────────────────
 
@@ -308,7 +312,7 @@ export function LiveProvider({ children }: { children: ReactNode }) {
         setConnected(false);
         addLog("system", "Disconnected — reconnecting...");
         es?.close();
-        reconnectTimer = setTimeout(connect, 3000);
+        reconnectTimer = setTimeout(connect, pollingMs);
       };
     };
 
@@ -318,7 +322,7 @@ export function LiveProvider({ children }: { children: ReactNode }) {
       es?.close();
       clearTimeout(reconnectTimer);
     };
-  }, [addLog]);
+  }, [addLog, pollingMs]);
 
   // ── Auto-scroll log ─────────────────────────────────────────────────────
 
