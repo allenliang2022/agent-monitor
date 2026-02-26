@@ -37,7 +37,7 @@ export default function Navbar() {
   }, []);
 
   return (
-    <nav aria-label="Main navigation" className="sticky top-0 z-50 backdrop-blur-md bg-slate-950/80 border-b border-slate-800/50">
+    <nav aria-label="Main navigation" className="sticky top-0 z-50 backdrop-blur-xl bg-slate-950/90 border-b border-slate-800/50 shadow-lg shadow-black/20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center h-12 gap-1">
           {/* Logo */}

@@ -96,6 +96,8 @@ export interface SSEUpdate {
   message?: string;
   tasks?: AgentTask[];
   fileChanges?: Record<string, FileChangesResult>;
+  recentCommits?: SSECommit[];
+  mergedBranches?: string[];
 }
 
 export interface Session {
@@ -117,6 +119,15 @@ export interface HealthData {
   raw?: string;
 }
 
+export interface SSECommit {
+  hash: string;
+  message: string;
+  author: string;
+  date: string;
+  refs: string[];
+  taskId?: string;
+}
+
 // ─── Context shape ──────────────────────────────────────────────────────────
 
 interface LiveContextValue {
@@ -134,6 +145,9 @@ interface LiveContextValue {
   gitData: Record<string, GitInfo>;
   handleAddGitDir: () => void;
   removeGitDir: (dir: string) => void;
+  // Merged branches and recent commits from SSE
+  mergedBranches: string[];
+  recentCommits: SSECommit[];
   // Log ref
   logEndRef: React.RefObject<HTMLDivElement | null>;
 }
@@ -168,6 +182,8 @@ export function LiveProvider({ children }: { children: ReactNode }) {
   const [gitDirs, setGitDirs] = useState<string[]>([]);
   const [gitInput, setGitInput] = useState("");
   const [gitData, setGitData] = useState<Record<string, GitInfo>>({});
+  const [mergedBranches, setMergedBranches] = useState<string[]>([]);
+  const [recentCommits, setRecentCommits] = useState<SSECommit[]>([]);
   const logEndRef = useRef<HTMLDivElement>(null);
   const eventIdRef = useRef(0);
   const seededRef = useRef(false);
@@ -314,6 +330,16 @@ export function LiveProvider({ children }: { children: ReactNode }) {
             if (data.fileChanges) {
               setFileChanges(data.fileChanges);
             }
+
+            // Update merged branches from SSE if present
+            if (data.mergedBranches) {
+              setMergedBranches(data.mergedBranches);
+            }
+
+            // Update recent commits from SSE if present
+            if (data.recentCommits) {
+              setRecentCommits(data.recentCommits);
+            }
           } else if (data.type === "error") {
             addLog("error", data.message ?? "Unknown error");
           }
@@ -404,6 +430,8 @@ export function LiveProvider({ children }: { children: ReactNode }) {
       gitData,
       handleAddGitDir,
       removeGitDir,
+      mergedBranches,
+      recentCommits,
       logEndRef,
     }),
     [
@@ -419,6 +447,8 @@ export function LiveProvider({ children }: { children: ReactNode }) {
       gitData,
       handleAddGitDir,
       removeGitDir,
+      mergedBranches,
+      recentCommits,
     ]
   );
 

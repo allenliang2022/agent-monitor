@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 const CLAWDBOT_DIR = join(process.cwd(), ".clawdbot");
 const PROJECT_DIR = process.cwd();
-const WORKTREE_BASE = join(PROJECT_DIR, "..");
+const WORKTREE_BASE = `${PROJECT_DIR}-worktrees`;
 
 interface PromptFile {
   name: string;
@@ -104,6 +104,20 @@ export async function GET() {
     } catch { /* ignore */ }
   }
 
+  // Get list of branches merged into main (for inferring status of older prompts)
+  const mergedBranchesRaw = execGit("git branch --merged main", PROJECT_DIR);
+  const mergedBranches = mergedBranchesRaw
+    .split("\n")
+    .map(b => b.trim().replace(/^\*\s*/, ""))
+    .filter(b => b.length > 0);
+
+  // Also get all local branch names (for prompts that have a branch but aren't merged)
+  const allBranchesRaw = execGit("git branch", PROJECT_DIR);
+  const allBranches = allBranchesRaw
+    .split("\n")
+    .map(b => b.trim().replace(/^\*\s*/, ""))
+    .filter(b => b.length > 0);
+
   // Read all prompt files from .clawdbot/prompts/
   if (existsSync(promptsDir)) {
     try {
@@ -115,6 +129,8 @@ export async function GET() {
 
         // Infer status using tmux + git, just like the other API routes
         let status = task?.status || "unknown";
+        let agent = task?.agent || "unknown";
+
         if (task && status === "running") {
           const tmuxSession = task.tmuxSession || task.id || "";
           const tmuxAlive = tmuxSession ? checkTmuxSession(tmuxSession) : false;
@@ -125,11 +141,40 @@ export async function GET() {
           }
         }
 
+        // Fallback for prompts without active-tasks.json entries:
+        // Check if feat/<taskId> branch exists and is merged into main
+        if (status === "unknown") {
+          const branchName = `feat/${taskId}`;
+          if (mergedBranches.includes(branchName)) {
+            status = "completed";
+            if (agent === "unknown") agent = "opencode";
+          } else if (allBranches.includes(branchName)) {
+            // Branch exists but not merged — it's in progress or dead
+            // Check if the worktree exists to determine if it's still active
+            const worktreePath = join(WORKTREE_BASE, taskId);
+            if (existsSync(worktreePath)) {
+              const tmuxAlive = checkTmuxSession(taskId);
+              if (tmuxAlive) {
+                status = "running";
+              } else {
+                status = inferStatusFromGit(
+                  { id: taskId, agent: "opencode", description: taskId, status: "running", startedAt: 0, branch: branchName },
+                  worktreePath
+                );
+              }
+            } else {
+              // Branch exists, no worktree — likely completed
+              status = "completed";
+            }
+            if (agent === "unknown") agent = "opencode";
+          }
+        }
+
         prompts.push({
           name: task?.description || taskId,
           filename: file,
           content,
-          agent: task?.agent || "unknown",
+          agent,
           taskId,
           status,
           startedAt: task?.startedAt || null,

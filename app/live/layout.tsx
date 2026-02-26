@@ -13,7 +13,7 @@ export default function LiveLayout({ children }: { children: React.ReactNode }) 
     <SettingsProvider>
       <LiveProvider>
         <ErrorBoundary label="Live Dashboard">
-          <div className="min-h-screen bg-gradient-to-b from-[#0a0a1a] to-[#111128] text-slate-200 pt-14">
+          <div className="min-h-screen bg-gradient-to-b from-[#0a0a1a] to-[#111128] text-slate-200 pt-16">
             <AnimatePresence mode="wait">
               <motion.div
                 key={pathname}

@@ -3,7 +3,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { useLive } from "../LiveContext";
-import type { AgentTask, GitCommit } from "../LiveContext";
+import type { AgentTask, GitCommit, SSECommit } from "../LiveContext";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -17,7 +17,9 @@ interface TimelineEvent {
     | "pr_created"
     | "ci_passed"
     | "ci_failed"
-    | "agent_died";
+    | "agent_died"
+    | "task_completed"
+    | "task_merged";
   title: string;
   detail: string;
   rawData?: Record<string, unknown>;
@@ -31,6 +33,8 @@ const EVENT_TYPE_TO_CATEGORY: Record<TimelineEvent["type"], FilterCategory> = {
   agent_spawned: "agent",
   agent_died: "agent",
   status_change: "agent",
+  task_completed: "agent",
+  task_merged: "git",
   commit_pushed: "git",
   pr_created: "system",
   ci_passed: "system",
@@ -91,6 +95,18 @@ const eventStyles: Record<
     bg: "bg-red-400/10",
     border: "border-red-400/20",
     text: "text-red-400",
+  },
+  task_completed: {
+    dot: "bg-emerald-400",
+    bg: "bg-emerald-400/10",
+    border: "border-emerald-400/20",
+    text: "text-emerald-400",
+  },
+  task_merged: {
+    dot: "bg-purple-500",
+    bg: "bg-purple-500/10",
+    border: "border-purple-500/20",
+    text: "text-purple-500",
   },
 };
 
@@ -154,22 +170,32 @@ function diffTasks(
     } else {
       // Status change
       if (prev.status !== task.status) {
+        // Determine the specific event type based on the new status
         let type: TimelineEvent["type"] = "status_change";
-        if (task.status === "ready_for_review") type = "pr_created";
-        if (task.status === "ci_failed") type = "ci_failed";
-        if (task.status === "done" || task.status === "completed")
-          type = "ci_passed";
+        if (task.status === "completed" || task.status === "done") {
+          type = "task_completed";
+        } else if (task.status === "ready_for_review") {
+          type = "pr_created";
+        } else if (task.status === "ci_failed") {
+          type = "ci_failed";
+        }
 
         events.push({
           id: `status-${task.id}-${task.status}-${Date.now()}`,
           timestamp: now,
           type,
-          title: `${task.name || task.id}: ${prev.status} → ${task.status}`,
-          detail: `Task status changed from ${prev.status} to ${task.status}`,
+          title: type === "task_completed"
+            ? `Task completed: ${task.name || task.id}`
+            : `${task.name || task.id}: ${prev.status} → ${task.status}`,
+          detail: type === "task_completed"
+            ? `${task.agent} finished task "${task.description || task.name}" on branch ${task.branch || "unknown"}`
+            : `Task status changed from ${prev.status} to ${task.status}`,
           rawData: {
             taskId: task.id,
             from: prev.status,
             to: task.status,
+            agent: task.agent,
+            branch: task.branch,
           },
         });
       }
@@ -222,12 +248,48 @@ function diffCommits(
   return { events, newMap };
 }
 
+function diffMergedBranches(
+  prevMerged: Set<string>,
+  newMerged: string[],
+  tasks: AgentTask[]
+): { events: TimelineEvent[]; newSet: Set<string> } {
+  const events: TimelineEvent[] = [];
+  const newSet = new Set(newMerged);
+  const now = new Date().toISOString();
+
+  for (const branch of newMerged) {
+    if (!prevMerged.has(branch)) {
+      // Extract task ID from branch name (feat/<task-id>)
+      const taskId = branch.replace(/^feat\//, "");
+      const task = tasks.find(t => t.id === taskId || t.branch === branch);
+
+      events.push({
+        id: `merged-${branch}-${Date.now()}`,
+        timestamp: now,
+        type: "task_merged",
+        title: `Branch merged: ${branch}`,
+        detail: task
+          ? `Task "${task.name || task.id}" (${task.agent}) merged into main`
+          : `Branch ${branch} merged into main`,
+        rawData: {
+          branch,
+          taskId,
+          taskName: task?.name || task?.id || taskId,
+          agent: task?.agent,
+        },
+      });
+    }
+  }
+
+  return { events, newSet };
+}
+
 // ─── Page ───────────────────────────────────────────────────────────────────
 
 const MAX_EVENTS = 50;
 
 export default function LiveTimelinePage() {
-  const { tasks, gitData } = useLive();
+  const { tasks, gitData, mergedBranches, recentCommits } = useLive();
   const [events, setEvents] = useState<TimelineEvent[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [autoScroll, setAutoScroll] = useState(true);
@@ -236,6 +298,7 @@ export default function LiveTimelinePage() {
   // Refs for previous data to compute diffs
   const prevTasksRef = useRef<AgentTask[]>([]);
   const prevCommitsRef = useRef<Map<string, Set<string>>>(new Map());
+  const prevMergedRef = useRef<Set<string>>(new Set());
   const initializedRef = useRef(false);
 
   // Auto-scroll refs
@@ -260,6 +323,18 @@ export default function LiveTimelinePage() {
           detail: `${task.agent} started task "${task.description || task.name}" on branch ${task.branch || "unknown"}`,
           rawData: { ...task } as unknown as Record<string, unknown>,
         });
+
+        // If task is completed, also seed a completion event
+        if (task.status === "completed" || task.status === "done") {
+          seedEvents.push({
+            id: `completed-${task.id}-seed`,
+            timestamp: task.completedAt || task.startedAt || new Date().toISOString(),
+            type: "task_completed",
+            title: `Task completed: ${task.name || task.id}`,
+            detail: `${task.agent} finished task "${task.description || task.name}" on branch ${task.branch || "unknown"}`,
+            rawData: { taskId: task.id, agent: task.agent, branch: task.branch },
+          });
+        }
       }
 
       // Seed from existing git commits
@@ -275,6 +350,37 @@ export default function LiveTimelinePage() {
             rawData: { ...commit, directory: dir },
           });
         }
+      }
+
+      // Seed from SSE recent commits (cross-branch commits from last 24h)
+      for (const commit of recentCommits) {
+        const existsAlready = seedEvents.some(e => e.id === `commit-${commit.hash}-seed`);
+        if (!existsAlready) {
+          seedEvents.push({
+            id: `commit-${commit.hash}-seed`,
+            timestamp: commit.date || new Date().toISOString(),
+            type: "commit_pushed",
+            title: `Commit: ${commit.message?.slice(0, 80) || commit.hash.slice(0, 8)}`,
+            detail: `${commit.author || "unknown"} committed ${commit.hash.slice(0, 8)}${commit.taskId ? ` (task: ${commit.taskId})` : ""}`,
+            rawData: { ...commit },
+          });
+        }
+      }
+
+      // Seed merged branches as task_merged events
+      for (const branch of mergedBranches) {
+        const taskId = branch.replace(/^feat\//, "");
+        const task = tasks.find(t => t.id === taskId || t.branch === branch);
+        seedEvents.push({
+          id: `merged-${branch}-seed`,
+          timestamp: new Date().toISOString(),
+          type: "task_merged",
+          title: `Branch merged: ${branch}`,
+          detail: task
+            ? `Task "${task.name || task.id}" (${task.agent}) merged into main`
+            : `Branch ${branch} merged into main`,
+          rawData: { branch, taskId },
+        });
       }
 
       // Sort by timestamp descending
@@ -293,6 +399,7 @@ export default function LiveTimelinePage() {
         );
       }
       prevCommitsRef.current = commitMap;
+      prevMergedRef.current = new Set(mergedBranches);
       initializedRef.current = true;
       return;
     }
@@ -302,8 +409,13 @@ export default function LiveTimelinePage() {
       prevCommitsRef.current,
       gitData
     );
+    const { events: mergeEvents, newSet: newMergedSet } = diffMergedBranches(
+      prevMergedRef.current,
+      mergedBranches,
+      tasks
+    );
 
-    const newEvents = [...taskEvents, ...commitEvents];
+    const newEvents = [...taskEvents, ...commitEvents, ...mergeEvents];
 
     if (newEvents.length > 0) {
       setEvents((prev) => [...newEvents, ...prev].slice(0, MAX_EVENTS));
@@ -311,7 +423,8 @@ export default function LiveTimelinePage() {
 
     prevTasksRef.current = tasks;
     prevCommitsRef.current = newMap;
-  }, [tasks, gitData]);
+    prevMergedRef.current = newMergedSet;
+  }, [tasks, gitData, mergedBranches, recentCommits]);
 
   // ── Auto-scroll logic ──────────────────────────────────────────────────
 

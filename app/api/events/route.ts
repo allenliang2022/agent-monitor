@@ -230,7 +230,7 @@ function collectData() {
   }
   allSessions.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
 
-  const watchDirs = ["/Users/liang/work/agent-monitor"];
+  const watchDirs = [PROJECT_DIR];
   const gitStatuses: Record<string, unknown> = {};
   for (const dir of watchDirs) {
     gitStatuses[dir] = getGitStatus(dir);
@@ -250,6 +250,43 @@ function collectData() {
     }
   }
 
+  // Collect recent git commits from all branches (last 24 hours)
+  const recentCommitsRaw = execGit(
+    'git log --all --oneline --format="%H|%s|%an|%aI|%D" --since="24 hours ago"',
+    PROJECT_DIR
+  );
+  const recentCommits = recentCommitsRaw
+    .split("\n")
+    .filter(l => l.trim())
+    .map(line => {
+      const parts = line.split("|");
+      const refs = (parts[4] || "").split(",").map(r => r.trim()).filter(Boolean);
+      // Try to map commit to a task by matching branch refs
+      let taskId: string | undefined;
+      for (const ref of refs) {
+        const branchMatch = ref.match(/feat\/(.+)/);
+        if (branchMatch) {
+          taskId = branchMatch[1];
+          break;
+        }
+      }
+      return {
+        hash: parts[0] || "",
+        message: parts[1] || "",
+        author: parts[2] || "",
+        date: parts[3] || "",
+        refs,
+        taskId,
+      };
+    });
+
+  // Get branches merged into main (for detecting task merges)
+  const mergedBranchesRaw = execGit("git branch --merged main", PROJECT_DIR);
+  const mergedBranches = mergedBranchesRaw
+    .split("\n")
+    .map(b => b.trim().replace(/^\*\s*/, ""))
+    .filter(b => b.length > 0 && b.startsWith("feat/"));
+
   return {
     type: "update",
     timestamp: new Date().toISOString(),
@@ -257,6 +294,8 @@ function collectData() {
     git: gitStatuses,
     tasks,
     fileChanges,
+    recentCommits,
+    mergedBranches,
   };
 }
 
