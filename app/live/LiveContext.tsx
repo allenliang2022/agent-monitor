@@ -7,6 +7,7 @@ import {
   useEffect,
   useRef,
   useCallback,
+  useMemo,
   type ReactNode,
 } from "react";
 
@@ -138,6 +139,10 @@ interface LiveContextValue {
 
 const LiveContext = createContext<LiveContextValue | null>(null);
 
+/**
+ * Hook to access live dashboard state and actions.
+ * Must be used within a `<LiveProvider>`.
+ */
 export function useLive(): LiveContextValue {
   const ctx = useContext(LiveContext);
   if (!ctx) throw new Error("useLive must be used within <LiveProvider>");
@@ -146,6 +151,10 @@ export function useLive(): LiveContextValue {
 
 // ─── Provider ───────────────────────────────────────────────────────────────
 
+/**
+ * Provides live dashboard state via React context.
+ * Manages SSE connection, task polling, git directory watching, and event logging.
+ */
 export function LiveProvider({ children }: { children: ReactNode }) {
   const [connected, setConnected] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
@@ -369,24 +378,40 @@ export function LiveProvider({ children }: { children: ReactNode }) {
     [addLog]
   );
 
-  // ── Value ───────────────────────────────────────────────────────────────
+  // ── Value (memoized to prevent unnecessary consumer re-renders) ─────────
 
-  const value: LiveContextValue = {
-    connected,
-    initialLoading,
-    tasks,
-    fileChanges,
-    eventLog,
-    sseEventsCount,
-    uptime,
-    gitDirs,
-    gitInput,
-    setGitInput,
-    gitData,
-    handleAddGitDir,
-    removeGitDir,
-    logEndRef,
-  };
+  const value = useMemo<LiveContextValue>(
+    () => ({
+      connected,
+      initialLoading,
+      tasks,
+      fileChanges,
+      eventLog,
+      sseEventsCount,
+      uptime,
+      gitDirs,
+      gitInput,
+      setGitInput,
+      gitData,
+      handleAddGitDir,
+      removeGitDir,
+      logEndRef,
+    }),
+    [
+      connected,
+      initialLoading,
+      tasks,
+      fileChanges,
+      eventLog,
+      sseEventsCount,
+      uptime,
+      gitDirs,
+      gitInput,
+      gitData,
+      handleAddGitDir,
+      removeGitDir,
+    ]
+  );
 
   return <LiveContext.Provider value={value}>{children}</LiveContext.Provider>;
 }

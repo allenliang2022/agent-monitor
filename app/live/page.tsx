@@ -8,12 +8,12 @@ import {
   animate,
 } from "framer-motion";
 import Link from "next/link";
-import { useEffect, useRef, useMemo } from "react";
+import { useEffect, useRef, useMemo, memo } from "react";
 import { useLive } from "./LiveContext";
 
 // ─── Animated Counter ──────────────────────────────────────────────────────
 
-function AnimatedCounter({
+const AnimatedCounter = memo(function AnimatedCounter({
   value,
   prefix = "",
   suffix = "",
@@ -46,7 +46,7 @@ function AnimatedCounter({
       {prefix}0{suffix}
     </span>
   );
-}
+});
 
 // ─── Stat Card ──────────────────────────────────────────────────────────────
 
@@ -73,7 +73,7 @@ const colorMap = {
   },
 };
 
-function StatCard({
+const StatCard = memo(function StatCard({
   label,
   value,
   prefix,
@@ -114,7 +114,7 @@ function StatCard({
       </div>
     </motion.div>
   );
-}
+});
 
 // ─── Nav Cards ──────────────────────────────────────────────────────────────
 
@@ -233,8 +233,11 @@ export default function LiveOverviewPage() {
     logEndRef,
   } = useLive();
 
-  const activeAgents = tasks.filter((t) => t.status === "running").length;
-  const totalTasks = tasks.length;
+  const activeAgents = useMemo(
+    () => tasks.filter((t) => t.status === "running").length,
+    [tasks]
+  );
+  const totalTasks = useMemo(() => tasks.length, [tasks]);
 
   const totalFilesChanged = useMemo(() => {
     let count = 0;
