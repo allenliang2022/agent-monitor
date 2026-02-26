@@ -40,5 +40,19 @@
     "retries": 0,
     "maxRetries": 3,
     "notifyOnComplete": true
+  },
+  {
+    "id": "round2-ui-fix",
+    "tmuxSession": "agent-round2-ui-fix",
+    "agent": "opencode",
+    "description": "Fix architecture names, git loading, prompt logs",
+    "repo": "agent-monitor",
+    "worktree": "round2-ui-fix",
+    "branch": "feat/round2-ui-fix",
+    "startedAt": 1772070650000,
+    "status": "running",
+    "retries": 0,
+    "maxRetries": 3,
+    "notifyOnComplete": true
   }
 ]

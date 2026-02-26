@@ -1,0 +1,832 @@
+[0m
+> build · claude-opus-4.6
+[0m
+[0m# [0mTodos
+[ ] Fix Git page loading regression - gitData not populated/used correctly
+[ ] Fix Agent page Live Output - show logs for completed tasks
+[ ] Render Files page treemap - data not passed to component
+[ ] Run npm run build and verify
+[ ] Commit with message: fix: git loading, agent logs, files treemap
+[0m
+I'll start by exploring the current state of the codebase to understand the issues before making fixes.
+[0m
+[0m→ [0mRead app/live/git/page.tsx
+[0m→ [0mRead app/live/LiveContext.tsx
+[0m→ [0mRead app/live/agent/page.tsx
+[0m→ [0mRead app/live/files/page.tsx
+[0m✱ [0mGlob "app/api/git/route.ts"[90m 1 match[0m
+[0m✱ [0mGlob "app/api/agent-log/route.ts"[90m 1 match[0m
+[0m✱ [0mGlob "app/api/files/route.ts"[90m 0 matches[0m
+[0m✱ [0mGlob "app/api/agent-tasks/route.ts"[90m 1 match[0m
+[0m
+Now let me check the API endpoints to understand the data flow:
+[0m
+[0m✱ [0mGlob "app/api/events/route.ts"[90m 1 match[0m
+[0m→ [0mRead app/api/git/route.ts
+[0m→ [0mRead app/api/agent-log/route.ts
+[0m→ [0mRead app/api/events/route.ts
+[0m→ [0mRead app/api/agent-tasks/route.ts
+[0m✱ [0mGlob "app/api/files*/**"[90m 0 matches[0m
+[0m✱ [0mGlob "app/api/**/route.ts"[90m 11 matches[0m
+[0m
+Now I have a clear picture of all three issues. Let me analyze them:
+
+**Task 1 - Git page**: The `gitDirs` are auto-populated from tasks, and `fetchGit` polls them. The code at `LiveContext.tsx:271-278` polls all `gitDirs`. Looking at the git page, `activeInfo = gitData[resolvedActiveDir]` at line 1228. The issue is that `gitDirs` are initially empty until tasks load, but the default hardcoded dir `/Users/liang/work/agent-monitor` is always added (line 235). The `resolvedActiveDir` should match keys in `gitData`. Let me check if there's a timing issue - `gitDirs.forEach(d => fetchGit(d))` fires when `gitDirs` changes, so the data should populate. But if the API call to `/api/git?dir=...` fails silently (the catch doesn't set error state in gitData), the UI just shows loading forever. Also, the `fetchGit` catch block only adds a log but doesn't set gitData with an error, so `gitData[dir]` remains undefined forever on failure.
+
+**Task 2 - Agent page**: The `useAgentLog` hook correctly fetches from `/api/agent-log?task=...`. The issue is that when lines are empty, it shows "Waiting for agent..." even for completed tasks. The API returns `{lines: [], error: "Log file not found"}` if the log doesn't exist - and the hook sets `lines` to `["# Log file not found"]` on error. But looking more carefully, the hook on line 21 checks `data.lines && Array.isArray(data.lines)` - if the API returns `{lines: [], error: "Log file not found"}`, `data.lines` is an empty array which is truthy, so `setLines([])` is called, and the empty state message shows. The error field is ignored when lines array is present (even empty).
+
+**Task 3 - Files page**: The `fileChanges` come from SSE data (`data.fileChanges`) or are set in context. Looking at the SSE endpoint, `fileChanges` is keyed by `task.worktreePath`. The files page iterates `Object.entries(fileChanges)` to build `allFiles`. If `fileChanges` is empty `{}`, it shows the "No file changes detected" message. But the task says data IS available from `/api/files` - let me check if there's a `/api/files` endpoint.
+[0m
+[0m→ [0mRead app/api/file-changes/route.ts
+[0m→ [0mRead app/lib/git-changes.ts
+[0m
+Now I have a complete picture of all three issues. Let me fix them:
+
+**Issue 1 (Git page):** The `fetchGit` catch block in `LiveContext.tsx` doesn't set error state in `gitData`, so if the API call fails, `gitData[dir]` stays `undefined` forever, causing infinite "Loading git status...". Fix: set an error entry in `gitData` on fetch failure.
+
+**Issue 2 (Agent page):** The API returns `{lines: [], error: "Log file not found"}`. The hook sets `setLines([])` because `data.lines` is present (but empty). The empty-state message then shows "Waiting for agent...". Fix: handle the case where lines is empty but error is present - show the error. Also, for completed tasks with no log file, show a more appropriate message.
+
+**Issue 3 (Files page):** The `fileChanges` data comes exclusively from SSE via `data.fileChanges`. The SSE endpoint collects file changes from task worktrees. If there are no tasks with worktrees, or worktrees don't exist, `fileChanges` is empty. But tasks DO have `liveFiles` data attached directly. The files page should also use task-level `liveFiles` as a fallback, and/or actively fetch from `/api/file-changes`. Let me also check if the SSE data propagation is the issue - the tasks have `liveFiles` but `fileChanges` might be empty if worktree paths don't exist at API collection time.
+
+Let me start fixing:
+[0m
+[0m# [0mTodos
+[ ] Fix Git page loading regression - gitData not populated/used correctly
+[ ] Fix Agent page Live Output - show logs for completed tasks
+[ ] Render Files page treemap - data not passed to component
+[ ] Run npm run build and verify
+[ ] Commit with message: fix: git loading, agent logs, files treemap
+[0m
+### Fix 1: Git page loading regression
+
+The problem is in `LiveContext.tsx` - the `fetchGit` catch block doesn't set `gitData[dir]` with an error, so on failure it remains `undefined` forever. Fix the catch to store an error entry:
+[0m
+[0m← [0mEdit app/live/LiveContext.tsx
+Index: /Users/liang/work/agent-monitor-worktrees/round4-git-agent-files/app/live/LiveContext.tsx
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/round4-git-agent-files/app/live/LiveContext.tsx
++++ /Users/liang/work/agent-monitor-worktrees/round4-git-agent-files/app/live/LiveContext.tsx
+@@ -260,8 +260,21 @@
+         addLog("git-error", `${dir}: ${data.error}`);
+       }
+     } catch {
+       addLog("git-error", `Failed to fetch git status for ${dir}`);
++      setGitData((prev) => ({
++        ...prev,
++        [dir]: {
++          directory: dir,
++          branch: "",
++          clean: true,
++          changedFiles: 0,
++          status: "",
++          recentCommits: [],
++          diffStat: "",
++          error: `Failed to fetch git status for ${dir}`,
++        },
++      }));
+     }
+   },
+   [addLog]
+ );
+
+[0m
+Now I also need to make sure `fetchGit` is called immediately when tasks populate `gitDirs`. The current effect at line 271 does fire on `gitDirs` change, so that should be fine. But let me also check: if the API returns a non-200 status, `res.json()` may throw or return unexpected data. Let me add a check:
+[0m
+[0m← [0mEdit app/live/LiveContext.tsx
+Index: /Users/liang/work/agent-monitor-worktrees/round4-git-agent-files/app/live/LiveContext.tsx
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/round4-git-agent-files/app/live/LiveContext.tsx
++++ /Users/liang/work/agent-monitor-worktrees/round4-git-agent-files/app/live/LiveContext.tsx
+@@ -253,8 +253,27 @@
+ const fetchGit = useCallback(
+   async (dir: string) => {
+     try {
+       const res = await fetch(`/api/git?dir=${encodeURIComponent(dir)}`);
++      if (!res.ok) {
++        const errData = await res.json().catch(() => ({}));
++        const errMsg = errData.error || `HTTP ${res.status}`;
++        addLog("git-error", `${dir}: ${errMsg}`);
++        setGitData((prev) => ({
++          ...prev,
++          [dir]: {
++            directory: dir,
++            branch: "",
++            clean: true,
++            changedFiles: 0,
++            status: "",
++            recentCommits: [],
++            diffStat: "",
++            error: errMsg,
++          },
++        }));
++        return;
++      }
+       const data: GitInfo = await res.json();
+       setGitData((prev) => ({ ...prev, [dir]: data }));
+       if (data.error) {
+         addLog("git-error", `${dir}: ${data.error}`);
+
+[0m
+[0m# [0mTodos
+[x] Fix Git page loading regression - gitData not populated/used correctly
+[ ] Fix Agent page Live Output - show logs for completed tasks
+[ ] Render Files page treemap - data not passed to component
+[ ] Run npm run build and verify
+[ ] Commit with message: fix: git loading, agent logs, files treemap
+[0m
+### Fix 2: Agent page Live Output
+
+The issue: when API returns `{lines: [], error: "Log file not found"}`, the hook sets `lines` to `[]` because `data.lines` is present (but empty). The empty array triggers the "Waiting for agent" fallback. Fix: prioritize the error field when lines is empty.
+[0m
+[0m← [0mEdit app/live/agent/page.tsx
+Index: /Users/liang/work/agent-monitor-worktrees/round4-git-agent-files/app/live/agent/page.tsx
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/round4-git-agent-files/app/live/agent/page.tsx
++++ /Users/liang/work/agent-monitor-worktrees/round4-git-agent-files/app/live/agent/page.tsx
+@@ -5,9 +5,9 @@
+ import { useLive } from "../LiveContext";
+ 
+ // ─── Real agent log hook ────────────────────────────────────────────────────
+ 
+-function useAgentLog(taskId: string | null) {
++function useAgentLog(taskId: string | null, isCompleted: boolean) {
+   const [lines, setLines] = useState<string[]>([]);
+   const scrollRef = useRef<HTMLDivElement>(null);
+ 
+   const fetchLog = useCallback(async () => {
+@@ -17,17 +17,25 @@
+     }
+     try {
+       const res = await fetch(`/api/agent-log?task=${encodeURIComponent(taskId)}`);
+       const data = await res.json();
+-      if (data.lines && Array.isArray(data.lines)) {
++      if (data.lines && Array.isArray(data.lines) && data.lines.length > 0) {
+         setLines(data.lines);
+       } else if (data.error) {
+-        setLines([`# ${data.error}`]);
++        // Log file not found or other error — show contextual message
++        if (isCompleted) {
++          setLines([`# Task ${taskId} completed`, `# Log file not available (may have been cleaned up)`]);
++        } else {
++          setLines([`# ${data.error}`]);
++        }
++      } else {
++        // Empty lines, no error — agent may not have produced output yet
++        setLines([]);
+       }
+     } catch {
+       setLines(["# Failed to fetch agent log"]);
+     }
+-  }, [taskId]);
++  }, [taskId, isCompleted]);
+ 
+   useEffect(() => {
+     fetchLog();
+     const interval = setInterval(fetchLog, 3000);
+
+[0m
+Now update the call site to pass `isCompleted`:
+[0m
+[0m← [0mEdit app/live/agent/page.tsx
+Index: /Users/liang/work/agent-monitor-worktrees/round4-git-agent-files/app/live/agent/page.tsx
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/round4-git-agent-files/app/live/agent/page.tsx
++++ /Users/liang/work/agent-monitor-worktrees/round4-git-agent-files/app/live/agent/page.tsx
+@@ -91,12 +91,13 @@
+ }, [runningTask, latestTask, selectedTaskId]);
+ 
+ const selectedTask = tasks.find((t) => t.id === selectedTaskId) ?? latestTask;
+ const isActive = selectedTask?.tmuxAlive || selectedTask?.status === "running";
++const isCompleted = selectedTask?.status === "completed" || selectedTask?.status === "done";
+ const hasNoRunning = !runningTask;
+ const showTaskSelector = tasks.length > 0 && (tasks.length > 1 || hasNoRunning);
+ 
+-const { lines, scrollRef } = useAgentLog(selectedTask?.id ?? null);
++const { lines, scrollRef } = useAgentLog(selectedTask?.id ?? null, isCompleted || false);
+ 
+ const recentCompleted = tasks
+   .filter((t) => t.status === "completed" || t.status === "done")
+   .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())
+
+[0m
+Now also update the empty-state message to be more context-aware:
+[0m
+[0m← [0mEdit app/live/agent/page.tsx
+Index: /Users/liang/work/agent-monitor-worktrees/round4-git-agent-files/app/live/agent/page.tsx
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/round4-git-agent-files/app/live/agent/page.tsx
++++ /Users/liang/work/agent-monitor-worktrees/round4-git-agent-files/app/live/agent/page.tsx
+@@ -333,11 +333,15 @@
+   ) : (
+     <div className="flex flex-col items-center justify-center h-full text-slate-600 gap-2">
+       <span className="text-2xl opacity-30">$_</span>
+       <span className="text-xs">
+-        {selectedTask
+-          ? "No log output yet. Waiting for agent to produce output..."
+-          : "No active agent process. Spawn a task to see live output."}
++        {!selectedTask
++          ? "No active agent process. Spawn a task to see live output."
++          : isActive
++          ? "Waiting for agent output..."
++          : isCompleted
++          ? "Task completed. No log output available."
++          : "No log output for this task."}
+       </span>
+     </div>
+   )}
+ </div>
+
+[0m
+[0m# [0mTodos
+[x] Fix Git page loading regression - gitData not populated/used correctly
+[x] Fix Agent page Live Output - show logs for completed tasks
+[ ] Render Files page treemap - data not passed to component
+[ ] Run npm run build and verify
+[ ] Commit with message: fix: git loading, agent logs, files treemap
+[0m
+### Fix 3: Files page treemap not rendering
+
+The files page depends on `fileChanges` from context, which comes from SSE. The SSE endpoint (`/api/events`) collects `fileChanges` from task worktrees. If worktrees don't exist at the time of collection, `fileChanges` will be empty `{}`.
+
+However, each task already has `liveFiles`, `liveAdditions`, `liveDeletions`, and `liveFileCount` directly attached. The files page doesn't use these task-level file data as a fallback.
+
+The fix: the files page should also build its file list from task-level `liveFiles` when `fileChanges` from context is empty or incomplete. This way, if SSE file changes haven't populated yet (or worktree paths are incorrect), the treemap still renders from the task data.
+[0m
+[0m← [0mEdit app/live/files/page.tsx
+Index: /Users/liang/work/agent-monitor-worktrees/round4-git-agent-files/app/live/files/page.tsx
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/round4-git-agent-files/app/live/files/page.tsx
++++ /Users/liang/work/agent-monitor-worktrees/round4-git-agent-files/app/live/files/page.tsx
+@@ -230,14 +230,39 @@
+ const [sortField, setSortField] = useState<"total" | "additions" | "deletions" | "path">("total");
+ const [sortAsc, setSortAsc] = useState(false);
+ 
+ // Build task key -> color index mapping
++// Use fileChanges from context (SSE), falling back to task-level liveFiles
++const effectiveFileChanges = useMemo(() => {
++  // If SSE-provided fileChanges has actual file data, use it
++  const hasSSEData = Object.values(fileChanges).some(
++    (fc) => fc.files && fc.files.length > 0
++  );
++  if (hasSSEData) return fileChanges;
++
++  // Fallback: build fileChanges from task-level liveFiles
++  const fallback: Record<string, FileChangesResult> = {};
++  for (const task of tasks) {
++    const key = task.worktreePath || task.id;
++    if (task.liveFiles && task.liveFiles.length > 0) {
++      fallback[key] = {
++        directory: key,
++        files: task.liveFiles,
++        totalFiles: task.liveFileCount ?? task.liveFiles.length,
++        totalAdditions: task.liveAdditions ?? task.liveFiles.reduce((s, f) => s + f.additions, 0),
++        totalDeletions: task.liveDeletions ?? task.liveFiles.reduce((s, f) => s + f.deletions, 0),
++      };
++    }
++  }
++  return Object.keys(fallback).length > 0 ? fallback : fileChanges;
++}, [fileChanges, tasks]);
++
+ const taskColorMap = useMemo(() => {
+   const map = new Map<string, number>();
+-  const keys = Object.keys(fileChanges);
++  const keys = Object.keys(effectiveFileChanges);
+   keys.forEach((key, i) => map.set(key, i % TASK_COLORS.length));
+   return map;
+-}, [fileChanges]);
++}, [effectiveFileChanges]);
+ 
+ // Flatten all file changes into a single list with task info
+ const allFiles: TreemapFile[] = useMemo(() => {
+   const result: TreemapFile[] = [];
+
+[0m
+Now update the `allFiles` memo to use `effectiveFileChanges` instead of `fileChanges`:
+[0m
+[0m← [0mEdit app/live/files/page.tsx
+Index: /Users/liang/work/agent-monitor-worktrees/round4-git-agent-files/app/live/files/page.tsx
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/round4-git-agent-files/app/live/files/page.tsx
++++ /Users/liang/work/agent-monitor-worktrees/round4-git-agent-files/app/live/files/page.tsx
+@@ -265,9 +265,9 @@
+ 
+ // Flatten all file changes into a single list with task info
+ const allFiles: TreemapFile[] = useMemo(() => {
+   const result: TreemapFile[] = [];
+-  for (const [taskKey, fcResult] of Object.entries(fileChanges)) {
++  for (const [taskKey, fcResult] of Object.entries(effectiveFileChanges)) {
+     const colorIndex = taskColorMap.get(taskKey) ?? 0;
+     for (const file of fcResult.files) {
+       result.push({
+         path: file.path,
+@@ -279,9 +279,9 @@
+       });
+     }
+   }
+   return result;
+-}, [fileChanges, taskColorMap]);
++}, [effectiveFileChanges, taskColorMap]);
+ 
+ // Sorted file list for table
+ const sortedFiles = useMemo(() => {
+   const sorted = [...allFiles].sort((a, b) => {
+
+[0m
+Also update the task legend to use `effectiveFileChanges`:
+[0m
+[0m← [0mEdit app/live/files/page.tsx
+Index: /Users/liang/work/agent-monitor-worktrees/round4-git-agent-files/app/live/files/page.tsx
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/round4-git-agent-files/app/live/files/page.tsx
++++ /Users/liang/work/agent-monitor-worktrees/round4-git-agent-files/app/live/files/page.tsx
+@@ -301,9 +301,9 @@
+ const HEIGHT = 500;
+ const rects = useMemo(() => calculateTreemap(allFiles, WIDTH, HEIGHT), [allFiles]);
+ 
+ // Task legend
+-const taskKeys = Object.keys(fileChanges);
++const taskKeys = Object.keys(effectiveFileChanges);
+ 
+ // Find task name by worktree key
+ function taskNameForKey(key: string): string {
+   const task = tasks.find((t) => t.worktreePath === key || t.id === key);
+
+[0m
+Now I need to add the `FileChangesResult` import since we're using it in the fallback construction. Let me check what's already imported:
+[0m
+[0m→ [0mRead app/live/files/page.tsx[90m [offset=1, limit=10][0m
+[0m
+[0m← [0mEdit app/live/files/page.tsx
+Index: /Users/liang/work/agent-monitor-worktrees/round4-git-agent-files/app/live/files/page.tsx
+===================================================================
+--- /Users/liang/work/agent-monitor-worktrees/round4-git-agent-files/app/live/files/page.tsx
++++ /Users/liang/work/agent-monitor-worktrees/round4-git-agent-files/app/live/files/page.tsx
+@@ -2,9 +2,9 @@
+ 
+ import { useMemo, useState } from "react";
+ import { motion } from "framer-motion";
+ import { useLive } from "../LiveContext";
+-import type { FileChange } from "../LiveContext";
++import type { FileChange, FileChangesResult } from "../LiveContext";
+ import { FilesSkeleton, useMinimumLoading } from "../components/LoadingSkeleton";
+ 
+ // Color palette per task index
+ const TASK_COLORS = [
+
+[0m
+Need to also import `FileChangesResult`:
+[0m
+[0m✱ [0mGrep "export interface FileChangesResult"[90m in app/live/LiveContext.tsx · 1 match[0m
+[0m
+Wait, let me check that `FileChangesResult` is actually exported from `LiveContext.tsx`:
+[0m
+[0m✱ [0mGrep "FileChange[^s]"[90m in app/live/files/page.tsx · 1 match[0m
+[0m
+Good. Now let me also check that `FileChange` is actually used (it was imported before, might be used elsewhere in the file):
+[0m
+`FileChange` isn't actually used in the file body. But it was imported before my change too, so I'll leave it since removing it is a separate concern and it doesn't cause a build error (just a lint warning at most). Let me verify the `liveFiles` field is available on the `AgentTask` type:
+[0m
+[0m✱ [0mGrep "liveFiles"[90m in app/live/LiveContext.tsx · 1 match[0m
+[0m
+[0m# [0mTodos
+[x] Fix Git page loading regression - gitData not populated/used correctly
+[x] Fix Agent page Live Output - show logs for completed tasks
+[x] Render Files page treemap - data not passed to component
+[ ] Run npm run build and verify
+[ ] Commit with message: fix: git loading, agent logs, files treemap
+[0m
+Good. `AgentTask` has `liveFiles?: FileChange[]`, `liveFileCount?: number`, `liveAdditions?: number`, `liveDeletions?: number`.
+[0m
+[0m$ [0mnpm run build 2>&1
+> agent-monitor@0.1.0 build
+> next build
+
+sh: next: command not found
+[0m
+[0m$ [0mnpx next build 2>&1
+⚠ Installing TypeScript as it was not found while loading "next.config.ts".
+
+Installing devDependencies (npm):
+- typescript
+
+
+added 402 packages in 7s
+
+146 packages are looking for funding
+  run `npm fund` for details
+
+▲ Next.js 16.1.6 (Turbopack)
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 2.2s
+  Running TypeScript ...
+  Collecting page data using 9 workers ...
+  Generating static pages using 9 workers (0/15) ...
+Error occurred prerendering page "/_global-error". Read more: https://nextjs.org/docs/messages/prerender-error
+Error [InvariantError]: Invariant: Expected workUnitAsyncStorage to have a store. This is a bug in Next.js.
+    at L (.next/server/chunks/ssr/[root-of-the-server]__d2487f31._.js:1:93918)
+    at bu (.next/server/chunks/ssr/[root-of-the-server]__d2487f31._.js:4:7733)
+Export encountered an error on /_global-error/page: /_global-error, exiting the build.
+⨯ Next.js build worker exited with code: 1 and signal: null
+[0m
+This is a known Next.js 16 prerender bug with `_global-error`, not related to my changes. Let me check if there's a `global-error.tsx` file and if this error existed before my changes:
+[0m
+[0m✱ [0mGlob "app/global-error*"[90m 0 matches[0m
+[0m
+[0m$ [0mgit stash && npx next build 2>&1
+Saved working directory and index state WIP on feat/round4-git-agent-files: 9815f72 fix: status inference, layout overlap, prompt status, timeline events
+▲ Next.js 16.1.6 (Turbopack)
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 1707.8ms
+  Running TypeScript ...
+  Collecting page data using 9 workers ...
+  Generating static pages using 9 workers (0/15) ...
+  Generating static pages using 9 workers (3/15) 
+  Generating static pages using 9 workers (7/15) 
+  Generating static pages using 9 workers (11/15) 
+✓ Generating static pages using 9 workers (15/15) in 184.0ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ƒ /api/agent-log
+├ ƒ /api/agent-tasks
+├ ƒ /api/config
+├ ƒ /api/events
+├ ƒ /api/file-changes
+├ ƒ /api/git
+├ ƒ /api/git-diff
+├ ƒ /api/health
+├ ƒ /api/prompts
+├ ƒ /api/sessions
+├ ƒ /api/spawn-task
+├ ○ /live
+├ ○ /live/agent
+├ ○ /live/agents
+├ ○ /live/architecture
+├ ○ /live/files
+├ ○ /live/git
+├ ○ /live/monitoring
+├ ○ /live/prompt
+├ ○ /live/settings
+├ ○ /live/tasks
+└ ○ /live/timeline
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+[0m
+Interesting - the original code builds fine. Let me restore my changes and try again:
+[0m
+[0m$ [0mgit stash pop 2>&1
+On branch feat/round4-git-agent-files
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   app/live/LiveContext.tsx
+	modified:   app/live/agent/page.tsx
+	modified:   app/live/files/page.tsx
+	modified:   package-lock.json
+	modified:   package.json
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	TASK.md
+
+no changes added to commit (use "git add" and/or "git commit -a")
+Dropped refs/stash@{0} (e5a673d3f507088ff4dc28721a129c5d2c514c1f)
+[0m
+[0m$ [0mnpx next build 2>&1
+▲ Next.js 16.1.6 (Turbopack)
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 1686.9ms
+  Running TypeScript ...
+  Collecting page data using 9 workers ...
+  Generating static pages using 9 workers (0/15) ...
+  Generating static pages using 9 workers (3/15) 
+  Generating static pages using 9 workers (7/15) 
+  Generating static pages using 9 workers (11/15) 
+✓ Generating static pages using 9 workers (15/15) in 211.4ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ƒ /api/agent-log
+├ ƒ /api/agent-tasks
+├ ƒ /api/config
+├ ƒ /api/events
+├ ƒ /api/file-changes
+├ ƒ /api/git
+├ ƒ /api/git-diff
+├ ƒ /api/health
+├ ƒ /api/prompts
+├ ƒ /api/sessions
+├ ƒ /api/spawn-task
+├ ○ /live
+├ ○ /live/agent
+├ ○ /live/agents
+├ ○ /live/architecture
+├ ○ /live/files
+├ ○ /live/git
+├ ○ /live/monitoring
+├ ○ /live/prompt
+├ ○ /live/settings
+├ ○ /live/tasks
+└ ○ /live/timeline
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+[0m
+[0m# [0mTodos
+[x] Fix Git page loading regression - gitData not populated/used correctly
+[x] Fix Agent page Live Output - show logs for completed tasks
+[x] Render Files page treemap - data not passed to component
+[x] Run npm run build and verify
+[ ] Commit with message: fix: git loading, agent logs, files treemap
+[0m
+Build passes cleanly. The earlier error was a fluke from the TypeScript installation changing `package.json`/`package-lock.json`.
+[0m
+[0m$ [0mgit status
+On branch feat/round4-git-agent-files
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   app/live/LiveContext.tsx
+	modified:   app/live/agent/page.tsx
+	modified:   app/live/files/page.tsx
+	modified:   package-lock.json
+	modified:   package.json
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	TASK.md
+
+no changes added to commit (use "git add" and/or "git commit -a")
+[0m
+[0m$ [0mgit diff app/live/LiveContext.tsx app/live/agent/page.tsx app/live/files/page.tsx
+diff --git a/app/live/LiveContext.tsx b/app/live/LiveContext.tsx
+index bdf343f..0226613 100644
+--- a/app/live/LiveContext.tsx
++++ b/app/live/LiveContext.tsx
+@@ -254,6 +254,25 @@ export function LiveProvider({ children }: { children: ReactNode }) {
+     async (dir: string) => {
+       try {
+         const res = await fetch(`/api/git?dir=${encodeURIComponent(dir)}`);
++        if (!res.ok) {
++          const errData = await res.json().catch(() => ({}));
++          const errMsg = errData.error || `HTTP ${res.status}`;
++          addLog("git-error", `${dir}: ${errMsg}`);
++          setGitData((prev) => ({
++            ...prev,
++            [dir]: {
++              directory: dir,
++              branch: "",
++              clean: true,
++              changedFiles: 0,
++              status: "",
++              recentCommits: [],
++              diffStat: "",
++              error: errMsg,
++            },
++          }));
++          return;
++        }
+         const data: GitInfo = await res.json();
+         setGitData((prev) => ({ ...prev, [dir]: data }));
+         if (data.error) {
+@@ -261,6 +280,19 @@ export function LiveProvider({ children }: { children: ReactNode }) {
+         }
+       } catch {
+         addLog("git-error", `Failed to fetch git status for ${dir}`);
++        setGitData((prev) => ({
++          ...prev,
++          [dir]: {
++            directory: dir,
++            branch: "",
++            clean: true,
++            changedFiles: 0,
++            status: "",
++            recentCommits: [],
++            diffStat: "",
++            error: `Failed to fetch git status for ${dir}`,
++          },
++        }));
+       }
+     },
+     [addLog]
+diff --git a/app/live/agent/page.tsx b/app/live/agent/page.tsx
+index cf9561a..fc70b8d 100644
+--- a/app/live/agent/page.tsx
++++ b/app/live/agent/page.tsx
+@@ -6,7 +6,7 @@ import { useLive } from "../LiveContext";
+ 
+ // ─── Real agent log hook ────────────────────────────────────────────────────
+ 
+-function useAgentLog(taskId: string | null) {
++function useAgentLog(taskId: string | null, isCompleted: boolean) {
+   const [lines, setLines] = useState<string[]>([]);
+   const scrollRef = useRef<HTMLDivElement>(null);
+ 
+@@ -18,15 +18,23 @@ function useAgentLog(taskId: string | null) {
+     try {
+       const res = await fetch(`/api/agent-log?task=${encodeURIComponent(taskId)}`);
+       const data = await res.json();
+-      if (data.lines && Array.isArray(data.lines)) {
++      if (data.lines && Array.isArray(data.lines) && data.lines.length > 0) {
+         setLines(data.lines);
+       } else if (data.error) {
+-        setLines([`# ${data.error}`]);
++        // Log file not found or other error — show contextual message
++        if (isCompleted) {
++          setLines([`# Task ${taskId} completed`, `# Log file not available (may have been cleaned up)`]);
++        } else {
++          setLines([`# ${data.error}`]);
++        }
++      } else {
++        // Empty lines, no error — agent may not have produced output yet
++        setLines([]);
+       }
+     } catch {
+       setLines(["# Failed to fetch agent log"]);
+     }
+-  }, [taskId]);
++  }, [taskId, isCompleted]);
+ 
+   useEffect(() => {
+     fetchLog();
+@@ -84,10 +92,11 @@ export default function AgentPage() {
+ 
+   const selectedTask = tasks.find((t) => t.id === selectedTaskId) ?? latestTask;
+   const isActive = selectedTask?.tmuxAlive || selectedTask?.status === "running";
++  const isCompleted = selectedTask?.status === "completed" || selectedTask?.status === "done";
+   const hasNoRunning = !runningTask;
+   const showTaskSelector = tasks.length > 0 && (tasks.length > 1 || hasNoRunning);
+ 
+-  const { lines, scrollRef } = useAgentLog(selectedTask?.id ?? null);
++  const { lines, scrollRef } = useAgentLog(selectedTask?.id ?? null, isCompleted || false);
+ 
+   const recentCompleted = tasks
+     .filter((t) => t.status === "completed" || t.status === "done")
+@@ -325,9 +334,13 @@ export default function AgentPage() {
+               <div className="flex flex-col items-center justify-center h-full text-slate-600 gap-2">
+                 <span className="text-2xl opacity-30">$_</span>
+                 <span className="text-xs">
+-                  {selectedTask
+-                    ? "No log output yet. Waiting for agent to produce output..."
+-                    : "No active agent process. Spawn a task to see live output."}
++                  {!selectedTask
++                    ? "No active agent process. Spawn a task to see live output."
++                    : isActive
++                    ? "Waiting for agent output..."
++                    : isCompleted
++                    ? "Task completed. No log output available."
++                    : "No log output for this task."}
+                 </span>
+               </div>
+             )}
+diff --git a/app/live/files/page.tsx b/app/live/files/page.tsx
+index c96507a..f516434 100644
+--- a/app/live/files/page.tsx
++++ b/app/live/files/page.tsx
+@@ -3,7 +3,7 @@
+ import { useMemo, useState } from "react";
+ import { motion } from "framer-motion";
+ import { useLive } from "../LiveContext";
+-import type { FileChange } from "../LiveContext";
++import type { FileChange, FileChangesResult } from "../LiveContext";
+ import { FilesSkeleton, useMinimumLoading } from "../components/LoadingSkeleton";
+ 
+ // Color palette per task index
+@@ -231,17 +231,42 @@ export default function LiveFilesPage() {
+   const [sortAsc, setSortAsc] = useState(false);
+ 
+   // Build task key -> color index mapping
++  // Use fileChanges from context (SSE), falling back to task-level liveFiles
++  const effectiveFileChanges = useMemo(() => {
++    // If SSE-provided fileChanges has actual file data, use it
++    const hasSSEData = Object.values(fileChanges).some(
++      (fc) => fc.files && fc.files.length > 0
++    );
++    if (hasSSEData) return fileChanges;
++
++    // Fallback: build fileChanges from task-level liveFiles
++    const fallback: Record<string, FileChangesResult> = {};
++    for (const task of tasks) {
++      const key = task.worktreePath || task.id;
++      if (task.liveFiles && task.liveFiles.length > 0) {
++        fallback[key] = {
++          directory: key,
++          files: task.liveFiles,
++          totalFiles: task.liveFileCount ?? task.liveFiles.length,
++          totalAdditions: task.liveAdditions ?? task.liveFiles.reduce((s, f) => s + f.additions, 0),
++          totalDeletions: task.liveDeletions ?? task.liveFiles.reduce((s, f) => s + f.deletions, 0),
++        };
++      }
++    }
++    return Object.keys(fallback).length > 0 ? fallback : fileChanges;
++  }, [fileChanges, tasks]);
++
+   const taskColorMap = useMemo(() => {
+     const map = new Map<string, number>();
+-    const keys = Object.keys(fileChanges);
++    const keys = Object.keys(effectiveFileChanges);
+     keys.forEach((key, i) => map.set(key, i % TASK_COLORS.length));
+     return map;
+-  }, [fileChanges]);
++  }, [effectiveFileChanges]);
+ 
+   // Flatten all file changes into a single list with task info
+   const allFiles: TreemapFile[] = useMemo(() => {
+     const result: TreemapFile[] = [];
+-    for (const [taskKey, fcResult] of Object.entries(fileChanges)) {
++    for (const [taskKey, fcResult] of Object.entries(effectiveFileChanges)) {
+       const colorIndex = taskColorMap.get(taskKey) ?? 0;
+       for (const file of fcResult.files) {
+         result.push({
+@@ -255,7 +280,7 @@ export default function LiveFilesPage() {
+       }
+     }
+     return result;
+-  }, [fileChanges, taskColorMap]);
++  }, [effectiveFileChanges, taskColorMap]);
+ 
+   // Sorted file list for table
+   const sortedFiles = useMemo(() => {
+@@ -277,7 +302,7 @@ export default function LiveFilesPage() {
+   const rects = useMemo(() => calculateTreemap(allFiles, WIDTH, HEIGHT), [allFiles]);
+ 
+   // Task legend
+-  const taskKeys = Object.keys(fileChanges);
++  const taskKeys = Object.keys(effectiveFileChanges);
+ 
+   // Find task name by worktree key
+   function taskNameForKey(key: string): string {
+[0m
+Now let me check git status and create the commit:
+[0m
+[0m$ [0mgit log --oneline -5
+9815f72 fix: status inference, layout overlap, prompt status, timeline events
+efddc95 fix: architecture names, git loading, prompt logs
+13cd468 fix: correct WORKTREE_BASE path to <project>-worktrees
+0be73ee fix: accurate task status inference and data display
+e7ec055 Merge feat/performance-opt (resolved conflict in layout.tsx)
+[0m
+The changes look correct. Now let me commit only the 3 relevant files (not `package.json`/`package-lock.json` which were auto-modified by TypeScript installation, and not `TASK.md`):
+[0m
+[0m$ [0mgit add app/live/LiveContext.tsx app/live/agent/page.tsx app/live/files/page.tsx && git commit -m "fix: git loading, agent logs, files treemap"
+[feat/round4-git-agent-files 409e081] fix: git loading, agent logs, files treemap
+ Committer: Liang <liang@LiangdeMac-mini.local>
+Your name and email address were configured automatically based
+on your username and hostname. Please check that they are accurate.
+You can suppress this message by setting them explicitly. Run the
+following command and follow the instructions in your editor to edit
+your configuration file:
+
+    git config --global --edit
+
+After doing this, you may fix the identity used for this commit with:
+
+    git commit --amend --reset-author
+
+ 3 files changed, 84 insertions(+), 14 deletions(-)
+[0m
+[0m$ [0mgit status
+On branch feat/round4-git-agent-files
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   package-lock.json
+	modified:   package.json
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	TASK.md
+
+no changes added to commit (use "git add" and/or "git commit -a")
+[0m
+[0m# [0mTodos
+[x] Fix Git page loading regression - gitData not populated/used correctly
+[x] Fix Agent page Live Output - show logs for completed tasks
+[x] Render Files page treemap - data not passed to component
+[x] Run npm run build and verify
+[x] Commit with message: fix: git loading, agent logs, files treemap
+[0m
+All three fixes are committed. Here's a summary of what was changed:
+
+### Task 1: Git page loading regression (`app/live/LiveContext.tsx`)
+- **Root cause**: `fetchGit` catch block didn't populate `gitData[dir]` on failure, so it stayed `undefined` forever, causing infinite "Loading git status..." spinner.
+- **Fix**: On both HTTP error responses (`!res.ok`) and network/parse failures (catch block), set `gitData[dir]` to a `GitInfo` object with an `error` field. The `TabContent` component already handles the `info.error` case and displays a friendly error message.
+
+### Task 2: Agent page Live Output (`app/live/agent/page.tsx`)
+- **Root cause**: The API returns `{lines: [], error: "Log file not found"}` for completed tasks. The hook checked `data.lines && Array.isArray(data.lines)` which was truthy for an empty array, so `setLines([])` was called, triggering the generic "Waiting for agent..." message.
+- **Fix**: Added `data.lines.length > 0` check. When lines is empty but error is present, show contextual messages (e.g., "Task completed. Log file not available" for completed tasks). Updated the fallback empty-state text to differentiate between active/completed/other states.
+
+### Task 3: Files page treemap (`app/live/files/page.tsx`)
+- **Root cause**: The treemap relied solely on `fileChanges` from SSE context, which is keyed by worktree path. If worktrees don't exist at SSE collection time, `fileChanges` is `{}` and the treemap renders nothing, even though tasks have `liveFiles` data directly attached.
+- **Fix**: Added `effectiveFileChanges` memo that falls back to building `FileChangesResult` records from task-level `liveFiles`/`liveAdditions`/`liveDeletions` when SSE `fileChanges` has no data. All downstream consumers (`taskColorMap`, `allFiles`, `taskKeys`) now use `effectiveFileChanges`.
+[0m

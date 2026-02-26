@@ -196,6 +196,7 @@ export async function GET() {
 
     return NextResponse.json({
       tasks,
+      projectDir: PROJECT_DIR,
       source: ACTIVE_TASKS_FILE,
       timestamp: new Date().toISOString(),
     });
