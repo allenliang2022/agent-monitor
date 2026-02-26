@@ -15,7 +15,7 @@ const ACTIVE_TASKS_FILE = join(CLAWDBOT_DIR, "active-tasks.json");
 // sibling worktrees are at the same level (e.g., .../agent-monitor-worktrees/settings-page).
 const PROJECT_DIR = process.cwd();
 const REPO_ROOT = PROJECT_DIR;
-const WORKTREE_BASE = join(PROJECT_DIR, "..");
+const WORKTREE_BASE = `${PROJECT_DIR}-worktrees`;
 
 interface RawTask {
   id: string;

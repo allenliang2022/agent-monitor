@@ -14,9 +14,9 @@ const OPENCLAW_DIR = join(process.env.HOME || "/Users/liang", ".openclaw");
 const CLAWDBOT_DIR = join(process.cwd(), ".clawdbot");
 const ACTIVE_TASKS_FILE = join(CLAWDBOT_DIR, "active-tasks.json");
 
-// Derive worktree base path: the parent directory of the current working directory.
+// Derive worktree base path: <project>-worktrees/
 const PROJECT_DIR = process.cwd();
-const WORKTREE_BASE = join(PROJECT_DIR, "..");
+const WORKTREE_BASE = `${PROJECT_DIR}-worktrees`;
 
 interface RawSession {
   sessionId?: string;

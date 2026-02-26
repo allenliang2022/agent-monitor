@@ -26,5 +26,19 @@
     "retries": 0,
     "maxRetries": 3,
     "notifyOnComplete": true
+  },
+  {
+    "id": "round1-data-fix",
+    "tmuxSession": "agent-round1-data-fix",
+    "agent": "opencode",
+    "description": "Fix data accuracy and status inference across all pages",
+    "repo": "agent-monitor",
+    "worktree": "round1-data-fix",
+    "branch": "feat/round1-data-fix",
+    "startedAt": 1772069686000,
+    "status": "running",
+    "retries": 0,
+    "maxRetries": 3,
+    "notifyOnComplete": true
   }
 ]
