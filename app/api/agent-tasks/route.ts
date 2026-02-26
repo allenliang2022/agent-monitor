@@ -10,15 +10,12 @@ export const dynamic = "force-dynamic";
 const CLAWDBOT_DIR = join(process.cwd(), ".clawdbot");
 const ACTIVE_TASKS_FILE = join(CLAWDBOT_DIR, "active-tasks.json");
 
-// Derive worktree base path: parent directory + '-worktrees/'
-// e.g., /Users/liang/work/agent-monitor -> /Users/liang/work/agent-monitor-worktrees/
+// Derive worktree base path: the parent directory of the current working directory.
+// When running from a worktree (e.g., .../agent-monitor-worktrees/round1-data-fix),
+// sibling worktrees are at the same level (e.g., .../agent-monitor-worktrees/settings-page).
 const PROJECT_DIR = process.cwd();
 const REPO_ROOT = PROJECT_DIR;
-const WORKTREE_BASE = join(
-  PROJECT_DIR,
-  "..",
-  `${PROJECT_DIR.split("/").pop()}-worktrees`
-);
+const WORKTREE_BASE = join(PROJECT_DIR, "..");
 
 interface RawTask {
   id: string;
@@ -49,6 +46,80 @@ function checkTmuxSession(sessionName: string): boolean {
     return true;
   } catch {
     return false;
+  }
+}
+
+/**
+ * Infer the true status of a task whose tmux session is no longer alive.
+ * Checks multiple git signals to determine if the agent completed its work:
+ *  1. Worktree exists & has commits not on main → completed
+ *  2. Worktree exists & HEAD is ancestor of main (branch merged) → completed
+ *  3. Worktree doesn't exist but branch was merged into main → completed
+ *  4. Worktree doesn't exist but branch ref exists with commits → completed
+ *  5. Otherwise → dead
+ */
+function inferStatusFromGit(task: RawTask, worktreePath: string | undefined): string {
+  try {
+    const wtPath = typeof worktreePath === "string" ? worktreePath : "";
+
+    if (wtPath && existsSync(wtPath)) {
+      // Worktree exists — check for commits on the branch
+      const branchCommits = execGit(
+        "git log --oneline HEAD --not main 2>/dev/null | wc -l",
+        wtPath
+      ).trim();
+      if (parseInt(branchCommits) > 0) {
+        return "completed";
+      }
+
+      // No exclusive commits — but maybe the branch was already merged into main.
+      // Check if HEAD is an ancestor of main (meaning main contains all of HEAD's work).
+      const headSha = execGit("git rev-parse HEAD", wtPath).trim();
+      const mainSha = execGit("git rev-parse main", wtPath).trim();
+      if (headSha && mainSha && headSha !== mainSha) {
+        // HEAD differs from main; check if main contains HEAD
+        const isAncestor = execGit(
+          `git merge-base --is-ancestor HEAD main && echo "yes" || echo "no"`,
+          wtPath
+        ).trim();
+        if (isAncestor === "yes") {
+          return "completed";
+        }
+      } else if (headSha && headSha === mainSha) {
+        // HEAD is exactly main — check if the branch name ref points elsewhere
+        // or if there's evidence of work (any diff from the initial main)
+        // This case means no divergence at all, likely dead
+        return "dead";
+      }
+
+      return "dead";
+    }
+
+    // Worktree doesn't exist — check from the repo root
+    const branchRef = task.branch || "";
+    if (branchRef) {
+      // Check if branch was merged into main
+      const merged = execGit(
+        `git branch --merged main 2>/dev/null`,
+        REPO_ROOT
+      ).trim();
+      if (merged && merged.split("\n").some(b => b.trim() === branchRef || b.trim() === `remotes/origin/${branchRef}`)) {
+        return "completed";
+      }
+
+      // Check if branch ref exists (has commits)
+      const branchExists = execGit(
+        `git rev-parse --verify "${branchRef}" 2>/dev/null && echo "yes" || echo "no"`,
+        REPO_ROOT
+      ).trim();
+      if (branchExists === "yes") {
+        return "completed";
+      }
+    }
+
+    return "dead";
+  } catch {
+    return "dead";
   }
 }
 
@@ -92,43 +163,8 @@ export async function GET() {
       // Smart status inference based on tmux + git state
       let inferredStatus = task.status || "unknown";
       if (inferredStatus === "running" && !tmuxAlive) {
-        // Agent died - check if it committed (success) or just crashed
-        try {
-          const wtPath = typeof worktreePath === 'string' ? worktreePath : '';
-          if (wtPath && existsSync(wtPath)) {
-            const branchCommits = execGit(
-              "git log --oneline HEAD --not main 2>/dev/null | wc -l",
-              wtPath
-            ).trim();
-            if (parseInt(branchCommits) > 0) {
-              inferredStatus = "completed";
-            } else {
-              inferredStatus = "dead";
-            }
-          } else {
-            // Worktree removed - check if branch was merged to main
-            try {
-              const merged = execGit(
-                `git branch --merged main 2>/dev/null | grep -q "${task.branch || 'never-match'}" && echo "yes" || echo "no"`,
-                REPO_ROOT
-              ).trim();
-              if (merged === "yes") {
-                inferredStatus = "completed";
-              } else {
-                // Check if branch exists at all (has commits)
-                const branchExists = execGit(
-                  `git rev-parse --verify "${task.branch}" 2>/dev/null && echo "yes" || echo "no"`,
-                  REPO_ROOT
-                ).trim();
-                inferredStatus = branchExists === "yes" ? "completed" : "dead";
-              }
-            } catch {
-              inferredStatus = "dead";
-            }
-          }
-        } catch {
-          inferredStatus = "dead";
-        }
+        // Agent's tmux session is gone - check git state to determine outcome
+        inferredStatus = inferStatusFromGit(task, worktreePath);
       }
 
       // Get file changes using the shared detection logic

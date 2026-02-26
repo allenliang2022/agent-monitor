@@ -220,7 +220,7 @@ export default function AgentPage() {
                     : "bg-slate-500/10 text-slate-500 border-slate-500/20"
                 }`}
               >
-                {isActive ? "ACTIVE" : selectedTask?.tmuxAlive === false ? "DEAD" : (selectedTask?.status?.toUpperCase() ?? "IDLE")}
+                {isActive ? "ACTIVE" : selectedTask?.status === "completed" || selectedTask?.status === "done" ? "COMPLETED" : selectedTask?.status === "failed" || selectedTask?.status === "ci_failed" ? "FAILED" : selectedTask?.status === "dead" ? "DEAD" : (selectedTask?.status?.toUpperCase() ?? "IDLE")}
               </span>
             </div>
           </div>

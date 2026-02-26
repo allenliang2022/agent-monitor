@@ -14,13 +14,9 @@ const OPENCLAW_DIR = join(process.env.HOME || "/Users/liang", ".openclaw");
 const CLAWDBOT_DIR = join(process.cwd(), ".clawdbot");
 const ACTIVE_TASKS_FILE = join(CLAWDBOT_DIR, "active-tasks.json");
 
-// Derive worktree base path from project directory
+// Derive worktree base path: the parent directory of the current working directory.
 const PROJECT_DIR = process.cwd();
-const WORKTREE_BASE = join(
-  PROJECT_DIR,
-  "..",
-  `${PROJECT_DIR.split("/").pop()}-worktrees`
-);
+const WORKTREE_BASE = join(PROJECT_DIR, "..");
 
 interface RawSession {
   sessionId?: string;
@@ -108,6 +104,68 @@ function checkTmuxSession(sessionName: string): boolean {
   }
 }
 
+/**
+ * Infer the true status of a task whose tmux session is no longer alive.
+ * Checks multiple git signals to determine if the agent completed its work.
+ */
+function inferStatusFromGit(task: RawTask, worktreePath: string | undefined): string {
+  try {
+    const wtPath = typeof worktreePath === "string" ? worktreePath : "";
+
+    if (wtPath && existsSync(wtPath)) {
+      // Worktree exists — check for commits on the branch
+      const branchCommits = execGit(
+        "git log --oneline HEAD --not main 2>/dev/null | wc -l",
+        wtPath
+      ).trim();
+      if (parseInt(branchCommits) > 0) {
+        return "completed";
+      }
+
+      // No exclusive commits — check if branch was already merged into main
+      const headSha = execGit("git rev-parse HEAD", wtPath).trim();
+      const mainSha = execGit("git rev-parse main", wtPath).trim();
+      if (headSha && mainSha && headSha !== mainSha) {
+        const isAncestor = execGit(
+          `git merge-base --is-ancestor HEAD main && echo "yes" || echo "no"`,
+          wtPath
+        ).trim();
+        if (isAncestor === "yes") {
+          return "completed";
+        }
+      } else if (headSha && headSha === mainSha) {
+        return "dead";
+      }
+
+      return "dead";
+    }
+
+    // Worktree doesn't exist — check from repo root
+    const branchRef = task.branch || "";
+    if (branchRef) {
+      const merged = execGit(
+        `git branch --merged main 2>/dev/null`,
+        PROJECT_DIR
+      ).trim();
+      if (merged && merged.split("\n").some(b => b.trim() === branchRef || b.trim() === `remotes/origin/${branchRef}`)) {
+        return "completed";
+      }
+
+      const branchExists = execGit(
+        `git rev-parse --verify "${branchRef}" 2>/dev/null && echo "yes" || echo "no"`,
+        PROJECT_DIR
+      ).trim();
+      if (branchExists === "yes") {
+        return "completed";
+      }
+    }
+
+    return "dead";
+  } catch {
+    return "dead";
+  }
+}
+
 function readActiveTasks() {
   if (!existsSync(ACTIVE_TASKS_FILE)) return [];
   try {
@@ -124,20 +182,8 @@ function readActiveTasks() {
       // Smart status inference
       let inferredStatus = task.status || "unknown";
       if (inferredStatus === "running" && !tmuxAlive) {
-        try {
-          const wtPath = typeof worktreePath === 'string' ? worktreePath : '';
-          if (wtPath && existsSync(wtPath)) {
-            const branchCommits = execGit(
-              "git log --oneline HEAD --not main 2>/dev/null | wc -l",
-              wtPath
-            ).trim();
-            inferredStatus = parseInt(branchCommits) > 0 ? "completed" : "dead";
-          } else {
-            inferredStatus = "dead";
-          }
-        } catch {
-          inferredStatus = "dead";
-        }
+        // Agent's tmux session is gone — determine outcome from git state
+        inferredStatus = inferStatusFromGit(task, worktreePath);
       }
 
       // Get file stats using the shared detection logic
