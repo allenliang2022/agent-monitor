@@ -230,6 +230,7 @@ export default function LiveOverviewPage() {
     sseEventsCount,
     uptime,
     eventLog,
+    recentCommits: sseCommits,
     logEndRef,
   } = useLive();
 
@@ -240,21 +241,42 @@ export default function LiveOverviewPage() {
   const totalTasks = useMemo(() => tasks.length, [tasks]);
 
   const totalFilesChanged = useMemo(() => {
-    let count = 0;
+    // Primary: sum file changes from SSE (per-worktree)
+    let sseCount = 0;
     for (const key of Object.keys(fileChanges)) {
-      count += fileChanges[key].files.length;
+      sseCount += fileChanges[key].files.length;
     }
-    return count;
-  }, [fileChanges]);
+    if (sseCount > 0) return sseCount;
 
-  const totalCommits = useMemo(() => {
-    let count = 0;
+    // Fallback: sum changedFiles from git polling data
+    let gitCount = 0;
     for (const key of Object.keys(gitData)) {
       const info = gitData[key];
-      if (info.recentCommits) count += info.recentCommits.length;
+      if (info.changedFiles) gitCount += info.changedFiles;
     }
-    return count;
-  }, [gitData]);
+    // Also count from task liveFileCount
+    for (const task of tasks) {
+      if (task.liveFileCount) gitCount += task.liveFileCount;
+    }
+    return gitCount;
+  }, [fileChanges, gitData, tasks]);
+
+  const totalCommits = useMemo(() => {
+    // Primary: use SSE recent commits (deduplicated across all branches)
+    if (sseCommits.length > 0) return sseCommits.length;
+
+    // Fallback: sum recentCommits from git polling (deduplicate by hash)
+    const seen = new Set<string>();
+    for (const key of Object.keys(gitData)) {
+      const info = gitData[key];
+      if (info.recentCommits) {
+        for (const c of info.recentCommits) {
+          seen.add(c.hash);
+        }
+      }
+    }
+    return seen.size;
+  }, [gitData, sseCommits]);
 
   // Badge counts for nav cards
   const badgeCounts = useMemo(

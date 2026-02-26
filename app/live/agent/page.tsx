@@ -8,11 +8,13 @@ import { useLive } from "../LiveContext";
 
 function useAgentLog(taskId: string | null, isCompleted: boolean) {
   const [lines, setLines] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const fetchLog = useCallback(async () => {
     if (!taskId) {
       setLines([]);
+      setLoading(false);
       return;
     }
     try {
@@ -29,12 +31,21 @@ function useAgentLog(taskId: string | null, isCompleted: boolean) {
         }
       } else {
         // Empty lines, no error — agent may not have produced output yet
-        setLines([]);
+        // Don't clear lines if we already have content (prevents flicker)
+        setLines((prev) => prev.length > 0 ? prev : []);
       }
     } catch {
       setLines(["# Failed to fetch agent log"]);
+    } finally {
+      setLoading(false);
     }
   }, [taskId, isCompleted]);
+
+  // Reset loading state when taskId changes
+  useEffect(() => {
+    setLoading(true);
+    setLines([]);
+  }, [taskId]);
 
   useEffect(() => {
     fetchLog();
@@ -47,7 +58,7 @@ function useAgentLog(taskId: string | null, isCompleted: boolean) {
     scrollRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [lines]);
 
-  return { lines, scrollRef };
+  return { lines, loading, scrollRef };
 }
 
 // ─── Terminal line renderer ─────────────────────────────────────────────────
@@ -96,7 +107,7 @@ export default function AgentPage() {
   const hasNoRunning = !runningTask;
   const showTaskSelector = tasks.length > 0 && (tasks.length > 1 || hasNoRunning);
 
-  const { lines, scrollRef } = useAgentLog(selectedTask?.id ?? null, isCompleted || false);
+  const { lines, loading: logLoading, scrollRef } = useAgentLog(selectedTask?.id ?? null, isCompleted || false);
 
   const recentCompleted = tasks
     .filter((t) => t.status === "completed" || t.status === "done")
@@ -336,6 +347,8 @@ export default function AgentPage() {
                 <span className="text-xs">
                   {!selectedTask
                     ? "No active agent process. Spawn a task to see live output."
+                    : logLoading
+                    ? "Loading log..."
                     : isActive
                     ? "Waiting for agent output..."
                     : isCompleted

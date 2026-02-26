@@ -6,11 +6,17 @@ import { existsSync } from "fs";
 export const dynamic = "force-dynamic";
 
 const CLAWDBOT_DIR = join(process.cwd(), ".clawdbot");
+// Also check the main repo (in case running from a worktree)
+const MAIN_REPO_CLAWDBOT = join(process.env.HOME || "/Users/liang", "work", "agent-monitor", ".clawdbot");
 
-// Strip ANSI escape codes from terminal output
+// Strip ANSI escape codes and carriage returns from terminal output
 function stripAnsi(str: string): string {
   // eslint-disable-next-line no-control-regex
-  return str.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "").replace(/\x1b\]/g, "");
+  return str
+    .replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "")
+    .replace(/\x1b\]/g, "")
+    .replace(/\x1b\[[\d;]*m/g, "")
+    .replace(/\r/g, "");
 }
 
 export async function GET(request: NextRequest) {
@@ -33,8 +39,11 @@ export async function GET(request: NextRequest) {
   }
 
   const logPath = join(CLAWDBOT_DIR, "logs", `${sanitized}.log`);
+  // Fallback: check main repo .clawdbot/logs if not found locally
+  const fallbackPath = join(MAIN_REPO_CLAWDBOT, "logs", `${sanitized}.log`);
+  const resolvedPath = existsSync(logPath) ? logPath : existsSync(fallbackPath) ? fallbackPath : null;
 
-  if (!existsSync(logPath)) {
+  if (!resolvedPath) {
     return Response.json({
       taskId: sanitized,
       lines: [],
@@ -44,7 +53,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const content = await readFile(logPath, "utf-8");
+    const content = await readFile(resolvedPath, "utf-8");
     const allLines = content.split("\n");
     // Return last 200 lines, strip ANSI codes, filter empty
     const lines = allLines
