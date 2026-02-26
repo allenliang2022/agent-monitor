@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { useLive } from "../LiveContext";
-import type { FileChange } from "../LiveContext";
+import type { FileChange, FileChangesResult } from "../LiveContext";
 import { FilesSkeleton, useMinimumLoading } from "../components/LoadingSkeleton";
 
 // Color palette per task index
@@ -231,17 +231,42 @@ export default function LiveFilesPage() {
   const [sortAsc, setSortAsc] = useState(false);
 
   // Build task key -> color index mapping
+  // Use fileChanges from context (SSE), falling back to task-level liveFiles
+  const effectiveFileChanges = useMemo(() => {
+    // If SSE-provided fileChanges has actual file data, use it
+    const hasSSEData = Object.values(fileChanges).some(
+      (fc) => fc.files && fc.files.length > 0
+    );
+    if (hasSSEData) return fileChanges;
+
+    // Fallback: build fileChanges from task-level liveFiles
+    const fallback: Record<string, FileChangesResult> = {};
+    for (const task of tasks) {
+      const key = task.worktreePath || task.id;
+      if (task.liveFiles && task.liveFiles.length > 0) {
+        fallback[key] = {
+          directory: key,
+          files: task.liveFiles,
+          totalFiles: task.liveFileCount ?? task.liveFiles.length,
+          totalAdditions: task.liveAdditions ?? task.liveFiles.reduce((s, f) => s + f.additions, 0),
+          totalDeletions: task.liveDeletions ?? task.liveFiles.reduce((s, f) => s + f.deletions, 0),
+        };
+      }
+    }
+    return Object.keys(fallback).length > 0 ? fallback : fileChanges;
+  }, [fileChanges, tasks]);
+
   const taskColorMap = useMemo(() => {
     const map = new Map<string, number>();
-    const keys = Object.keys(fileChanges);
+    const keys = Object.keys(effectiveFileChanges);
     keys.forEach((key, i) => map.set(key, i % TASK_COLORS.length));
     return map;
-  }, [fileChanges]);
+  }, [effectiveFileChanges]);
 
   // Flatten all file changes into a single list with task info
   const allFiles: TreemapFile[] = useMemo(() => {
     const result: TreemapFile[] = [];
-    for (const [taskKey, fcResult] of Object.entries(fileChanges)) {
+    for (const [taskKey, fcResult] of Object.entries(effectiveFileChanges)) {
       const colorIndex = taskColorMap.get(taskKey) ?? 0;
       for (const file of fcResult.files) {
         result.push({
@@ -255,7 +280,7 @@ export default function LiveFilesPage() {
       }
     }
     return result;
-  }, [fileChanges, taskColorMap]);
+  }, [effectiveFileChanges, taskColorMap]);
 
   // Sorted file list for table
   const sortedFiles = useMemo(() => {
@@ -277,7 +302,7 @@ export default function LiveFilesPage() {
   const rects = useMemo(() => calculateTreemap(allFiles, WIDTH, HEIGHT), [allFiles]);
 
   // Task legend
-  const taskKeys = Object.keys(fileChanges);
+  const taskKeys = Object.keys(effectiveFileChanges);
 
   // Find task name by worktree key
   function taskNameForKey(key: string): string {

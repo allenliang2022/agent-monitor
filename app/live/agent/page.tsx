@@ -6,7 +6,7 @@ import { useLive } from "../LiveContext";
 
 // ─── Real agent log hook ────────────────────────────────────────────────────
 
-function useAgentLog(taskId: string | null) {
+function useAgentLog(taskId: string | null, isCompleted: boolean) {
   const [lines, setLines] = useState<string[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -18,15 +18,23 @@ function useAgentLog(taskId: string | null) {
     try {
       const res = await fetch(`/api/agent-log?task=${encodeURIComponent(taskId)}`);
       const data = await res.json();
-      if (data.lines && Array.isArray(data.lines)) {
+      if (data.lines && Array.isArray(data.lines) && data.lines.length > 0) {
         setLines(data.lines);
       } else if (data.error) {
-        setLines([`# ${data.error}`]);
+        // Log file not found or other error — show contextual message
+        if (isCompleted) {
+          setLines([`# Task ${taskId} completed`, `# Log file not available (may have been cleaned up)`]);
+        } else {
+          setLines([`# ${data.error}`]);
+        }
+      } else {
+        // Empty lines, no error — agent may not have produced output yet
+        setLines([]);
       }
     } catch {
       setLines(["# Failed to fetch agent log"]);
     }
-  }, [taskId]);
+  }, [taskId, isCompleted]);
 
   useEffect(() => {
     fetchLog();
@@ -84,10 +92,11 @@ export default function AgentPage() {
 
   const selectedTask = tasks.find((t) => t.id === selectedTaskId) ?? latestTask;
   const isActive = selectedTask?.tmuxAlive || selectedTask?.status === "running";
+  const isCompleted = selectedTask?.status === "completed" || selectedTask?.status === "done";
   const hasNoRunning = !runningTask;
   const showTaskSelector = tasks.length > 0 && (tasks.length > 1 || hasNoRunning);
 
-  const { lines, scrollRef } = useAgentLog(selectedTask?.id ?? null);
+  const { lines, scrollRef } = useAgentLog(selectedTask?.id ?? null, isCompleted || false);
 
   const recentCompleted = tasks
     .filter((t) => t.status === "completed" || t.status === "done")
@@ -325,9 +334,13 @@ export default function AgentPage() {
               <div className="flex flex-col items-center justify-center h-full text-slate-600 gap-2">
                 <span className="text-2xl opacity-30">$_</span>
                 <span className="text-xs">
-                  {selectedTask
-                    ? "No log output yet. Waiting for agent to produce output..."
-                    : "No active agent process. Spawn a task to see live output."}
+                  {!selectedTask
+                    ? "No active agent process. Spawn a task to see live output."
+                    : isActive
+                    ? "Waiting for agent output..."
+                    : isCompleted
+                    ? "Task completed. No log output available."
+                    : "No log output for this task."}
                 </span>
               </div>
             )}

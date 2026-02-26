@@ -254,6 +254,25 @@ export function LiveProvider({ children }: { children: ReactNode }) {
     async (dir: string) => {
       try {
         const res = await fetch(`/api/git?dir=${encodeURIComponent(dir)}`);
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          const errMsg = errData.error || `HTTP ${res.status}`;
+          addLog("git-error", `${dir}: ${errMsg}`);
+          setGitData((prev) => ({
+            ...prev,
+            [dir]: {
+              directory: dir,
+              branch: "",
+              clean: true,
+              changedFiles: 0,
+              status: "",
+              recentCommits: [],
+              diffStat: "",
+              error: errMsg,
+            },
+          }));
+          return;
+        }
         const data: GitInfo = await res.json();
         setGitData((prev) => ({ ...prev, [dir]: data }));
         if (data.error) {
@@ -261,6 +280,19 @@ export function LiveProvider({ children }: { children: ReactNode }) {
         }
       } catch {
         addLog("git-error", `Failed to fetch git status for ${dir}`);
+        setGitData((prev) => ({
+          ...prev,
+          [dir]: {
+            directory: dir,
+            branch: "",
+            clean: true,
+            changedFiles: 0,
+            status: "",
+            recentCommits: [],
+            diffStat: "",
+            error: `Failed to fetch git status for ${dir}`,
+          },
+        }));
       }
     },
     [addLog]
