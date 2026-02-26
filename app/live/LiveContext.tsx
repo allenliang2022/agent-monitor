@@ -223,7 +223,12 @@ export function LiveProvider({ children }: { children: ReactNode }) {
           newDirs.add(task.worktreePath);
         }
       }
-      return Array.from(newDirs);
+      const arr = Array.from(newDirs);
+      // Only update if content actually changed to avoid triggering unnecessary re-renders
+      if (arr.length === prev.length && arr.every((d, i) => d === prev[i])) {
+        return prev;
+      }
+      return arr;
     });
   }, [tasks]);
 

@@ -93,10 +93,11 @@ export default function LivePromptPage() {
     try {
       const res = await fetch(`/api/agent-log?task=${encodeURIComponent(selectedTask)}`);
       const data = await res.json();
-      if (data.lines && Array.isArray(data.lines)) {
+      if (data.error && (!data.lines || data.lines.length === 0)) {
+        // API returned an error with no lines (e.g., log file not found)
+        setLogLines([`# ${data.error}`]);
+      } else if (data.lines && Array.isArray(data.lines) && data.lines.length > 0) {
         setLogLines(data.lines);
-      } else if (data.error) {
-        setLogLines([`# Error: ${data.error}`]);
       } else {
         setLogLines(["# No log data available"]);
       }
@@ -388,7 +389,10 @@ export default function LivePromptPage() {
                   );
                 })}
                 {logLines.length === 0 && !logLoading && (
-                  <div className="text-slate-600">Waiting for log output...</div>
+                  <div className="text-slate-600">No log file found for this task.</div>
+                )}
+                {logLines.length === 0 && logLoading && (
+                  <div className="text-slate-600 animate-pulse">Loading log...</div>
                 )}
               </div>
             )}

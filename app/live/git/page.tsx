@@ -872,6 +872,17 @@ function TabContent({
   const [searchQuery, setSearchQuery] = useState("");
   const [searchDiffCache, setSearchDiffCache] = useState<Record<string, string[]>>({});
   const searchCacheFetchedRef = useRef(false);
+  const [loadingTimeout, setLoadingTimeout] = useState(false);
+
+  // If info is undefined for more than 10s, show an error instead of loading forever
+  useEffect(() => {
+    if (info) {
+      setLoadingTimeout(false);
+      return;
+    }
+    const timer = setTimeout(() => setLoadingTimeout(true), 10000);
+    return () => clearTimeout(timer);
+  }, [info]);
 
   // Fetch file names for commits to enable file-name search
   // Only fetch once per tab to avoid excessive API calls
@@ -990,13 +1001,20 @@ function TabContent({
   if (!info) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="flex items-center gap-2 text-xs font-mono text-slate-600">
-          <motion.span
-            animate={{ opacity: [0.3, 1, 0.3] }}
-            transition={{ duration: 1.5, repeat: Infinity }}
-          >
-            Loading git status...
-          </motion.span>
+        <div className="flex flex-col items-center gap-2 text-xs font-mono text-slate-600">
+          {loadingTimeout ? (
+            <>
+              <span className="text-amber-400/80">Could not load git status for this directory.</span>
+              <span className="text-slate-600 text-[10px]">{dir}</span>
+            </>
+          ) : (
+            <motion.span
+              animate={{ opacity: [0.3, 1, 0.3] }}
+              transition={{ duration: 1.5, repeat: Infinity }}
+            >
+              Loading git status...
+            </motion.span>
+          )}
         </div>
       </div>
     );

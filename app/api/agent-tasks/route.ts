@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { readFile } from "fs/promises";
-import { join } from "path";
+import { join, dirname } from "path";
 import { existsSync } from "fs";
 import { execSync } from "child_process";
 import { getFileChanges, execGit } from "../../lib/git-changes";
@@ -11,11 +11,11 @@ const CLAWDBOT_DIR = join(process.cwd(), ".clawdbot");
 const ACTIVE_TASKS_FILE = join(CLAWDBOT_DIR, "active-tasks.json");
 
 // Derive worktree base path: the parent directory of the current working directory.
-// When running from a worktree (e.g., .../agent-monitor-worktrees/round1-data-fix),
+// When running from a worktree (e.g., .../agent-monitor-worktrees/round2-ui-fix),
 // sibling worktrees are at the same level (e.g., .../agent-monitor-worktrees/settings-page).
 const PROJECT_DIR = process.cwd();
 const REPO_ROOT = PROJECT_DIR;
-const WORKTREE_BASE = `${PROJECT_DIR}-worktrees`;
+const WORKTREE_BASE = dirname(PROJECT_DIR);
 
 interface RawTask {
   id: string;

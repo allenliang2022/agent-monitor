@@ -103,7 +103,7 @@ export default function LiveArchitecturePage() {
     const nodeList: DiagramNode[] = [];
     const edgeList: DiagramEdge[] = [];
 
-    const centerX = 450;
+    const centerX = 500;
 
     // Fixed top nodes — Allen on the left, Nova in the center
     nodeList.push({
@@ -123,7 +123,7 @@ export default function LiveArchitecturePage() {
     const worktreeY = 380;
 
     if (allAgentTasks.length > 0) {
-      const spacing = Math.min(180, 800 / Math.max(allAgentTasks.length, 1));
+      const spacing = Math.min(220, 800 / Math.max(allAgentTasks.length, 1));
       const startX = centerX - ((allAgentTasks.length - 1) * spacing) / 2;
 
       allAgentTasks.forEach((task, i) => {
@@ -137,7 +137,7 @@ export default function LiveArchitecturePage() {
         // Agent node
         nodeList.push({
           id: agentId,
-          label: task.name || task.id.slice(0, 14),
+          label: task.name || task.id,
           sublabel: task.agent || "opencode",
           x: ax, y: agentY,
           color: active ? "#22d3ee" : completed ? "#22c55e" : dead ? "#ef4444" : "#64748b",
@@ -241,7 +241,7 @@ export default function LiveArchitecturePage() {
         transition={{ duration: 0.5 }}
         className="rounded-xl border border-slate-700 bg-slate-900/50 overflow-hidden"
       >
-        <svg viewBox={`0 0 900 ${viewH}`} className="w-full h-auto" preserveAspectRatio="xMidYMid meet">
+        <svg viewBox={`0 0 1000 ${viewH}`} className="w-full h-auto" preserveAspectRatio="xMidYMid meet">
           <defs>
             {edges.map((edge, i) => (
               <marker
@@ -353,7 +353,8 @@ export default function LiveArchitecturePage() {
 
             // Wider box for agent nodes to fit task name + status badge
             const isAgentNode = node.type === "agent";
-            const boxW = isAgentNode ? 140 : 110;
+            const isWorktreeNode = node.type === "worktree";
+            const boxW = isAgentNode ? 170 : isWorktreeNode ? 160 : 120;
             const boxH = isAgentNode ? 88 : 70;
 
             return (
@@ -401,7 +402,7 @@ export default function LiveArchitecturePage() {
                   fontFamily="monospace"
                   fontWeight="700"
                 >
-                  {node.label.length > 18 ? node.label.slice(0, 17) + "..." : node.label}
+                  {node.label}
                 </text>
 
                 {/* Sublabel */}
@@ -452,7 +453,7 @@ export default function LiveArchitecturePage() {
                     fontFamily="monospace"
                     opacity={0.6}
                   >
-                    {node.task.branch.length > 22 ? node.task.branch.slice(0, 21) + "..." : node.task.branch}
+                    {node.task.branch}
                   </text>
                 )}
 
@@ -472,7 +473,7 @@ export default function LiveArchitecturePage() {
           {/* Empty state — always show the core topology text */}
           {!hasAgents && (
             <text
-              x={450}
+              x={500}
               y={200}
               textAnchor="middle"
               fill="#64748b"
@@ -535,9 +536,9 @@ export default function LiveArchitecturePage() {
                       opacity: active ? 1 : completed ? 0.6 : 0.4,
                     }}
                   />
-                  <span className="text-slate-300 min-w-[120px] truncate">{task.name || task.id}</span>
+                  <span className="text-slate-300 min-w-[160px]">{task.name || task.id}</span>
                   <span className="text-cyan-400/70">{task.agent}</span>
-                  <span className="text-emerald-400/70 truncate max-w-[140px]">{task.branch || "—"}</span>
+                  <span className="text-emerald-400/70 truncate max-w-[200px]">{task.branch || "—"}</span>
                   <span
                     className="ml-auto px-2 py-0.5 rounded text-[10px] font-semibold border shrink-0"
                     style={{

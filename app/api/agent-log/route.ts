@@ -7,6 +7,12 @@ export const dynamic = "force-dynamic";
 
 const CLAWDBOT_DIR = join(process.cwd(), ".clawdbot");
 
+// Strip ANSI escape codes from terminal output
+function stripAnsi(str: string): string {
+  // eslint-disable-next-line no-control-regex
+  return str.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "").replace(/\x1b\]/g, "");
+}
+
 export async function GET(request: NextRequest) {
   const taskId = request.nextUrl.searchParams.get("task");
 
@@ -40,8 +46,11 @@ export async function GET(request: NextRequest) {
   try {
     const content = await readFile(logPath, "utf-8");
     const allLines = content.split("\n");
-    // Return last 100 lines
-    const lines = allLines.slice(-100).filter((line) => line.length > 0);
+    // Return last 200 lines, strip ANSI codes, filter empty
+    const lines = allLines
+      .slice(-200)
+      .map(stripAnsi)
+      .filter((line) => line.trim().length > 0);
 
     return Response.json({
       taskId: sanitized,
